@@ -11,7 +11,7 @@ Class mapping (dataset -> probe class / heavy subtype):
   medium_bus, heavy_bus -> bus;  motorcycle -> other
   medium_truck -> heavy / truck6;  heavy_truck, semi_trailer, full_trailer -> heavy / truck10
 
-Usage (CoreML env): python pipeline/thai_crops.py <dataset_dir> data_out/thai
+Usage (CoreML env): python modeling/thai_crops.py <dataset_dir> data_out/thai
   -> data_out/thai.parquet (one row per crop: image, group, y4, heavy_type, aug) + data_out/thai_emb.npy
 """
 import io
@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "pipeline"))   # classify_trucks lives in pipeline/
 import classify_trucks as ct  # noqa: E402
 
 NAMES = ['full_trailer', 'heavy_bus', 'heavy_truck', 'light_bus', 'light_truck', 'medium_bus', 'medium_truck',

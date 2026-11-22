@@ -1,0 +1,14 @@
+# Folder owners are requested for review on PRs that touch their folder.
+# Replace each OWNER_* placeholder line with the teammate's GitHub username (e.g. "/scraping/  @username")
+# and uncomment it. Until then everything falls back to the PM.
+
+*                 @fifaak
+
+# /scraping/      @OWNER_SCRAPING      # เพา   — web scraping
+# /pipeline/      @OWNER_DE            # เก้อ  — data engineering
+# /config/        @OWNER_DE
+# /modeling/      @OWNER_DS            # พัท   — data science (training, labels, evaluation)
+# /analysis/      @OWNER_DS
+# /dashboard/     @OWNER_BI            # เต้   — BI dashboard + clip
+# /insights/      @OWNER_INSIGHT       # ม่อน  — insights
+# /docs/          @fifaak              # ฟีฟ่า  — PM: architecture, slides, video

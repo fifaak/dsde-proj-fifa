@@ -1,11 +1,11 @@
 """Fine-tune a small CNN (EfficientNet-B0, ImageNet weights) to classify candidate crops as light/bus/heavy/other.
 
 Training data: Thai dataset crops (degraded on the fly to CCTV quality every epoch, see thai_crops.py) +
-our hand-labelled CCTV crops (labels/labels.csv, up-weighted). Evaluation: 5-fold CV over OUR labels
+our hand-labelled CCTV crops (modeling/labels/labels.csv, up-weighted). Evaluation: 5-fold CV over OUR labels
 (Thai data always in train), so numbers are comparable with the CLIP probe (heavy P 0.66 / R 0.67).
 
-Usage: python pipeline/train_cnn.py cv  [--no-thai]          # evaluate
-       python pipeline/train_cnn.py fit models/truck_cnn.pt  # train on everything, save weights
+Usage: python modeling/train_cnn.py cv --thai-dir <thai_dataset_dir> [--folds 1] [--no-thai]   # evaluate
+       python modeling/train_cnn.py fit models/truck_cnn.pt --thai-dir <thai_dataset_dir>  # train on all, save
 """
 import argparse
 import os
@@ -48,9 +48,9 @@ def crop_box(im, x1, y1, x2, y2, pad=0.15):
 
 
 def load_thai(root=Path(sys.argv[0]).parent):
-    root = Path("/private/tmp/claude-501/-Users-fifaak-Library-Application-Support-Claude-scratch-workspaces-"
-                "58de7c32-59f5-48a8-8b5b-6d740fe24037-3e15e6fe-ae02-4306-b7dc-a6ff9515a2e9-scratch-2026-11-19-"
-                "f83031/d4808de1-d4d8-42b1-ba3e-0a1eaf75f14c/scratchpad/thai_ds") if THAI_DIR is None else THAI_DIR
+    if THAI_DIR is None:
+        raise SystemExit("pass --thai-dir <unzipped Thailand-vehicles-2024-01-16 YOLO dataset>")
+    root = THAI_DIR
     cache = Path("data_out/thai_crops_cache.pkl")                      # decoding 2000 4K-6K JPEGs is the slow
     if cache.exists():                                                  # part; do it once, in parallel
         crops, ys = pickle.loads(cache.read_bytes())
@@ -82,7 +82,7 @@ def load_thai(root=Path(sys.argv[0]).parent):
 
 
 def load_ours():
-    lab = pd.read_csv("labels/labels.csv")
+    lab = pd.read_csv("modeling/labels/labels.csv")
     crops = [crop_box(Image.open(r.path).convert("RGB"), r.x1, r.y1, r.x2, r.y2) for r in lab.itertuples()]
     return crops, np.array([CLASSES.index(v) for v in lab.y4])
 

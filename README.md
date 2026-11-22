@@ -3,30 +3,52 @@
 Turns 61,319 raw BMA CCTV snapshots (100 cameras, 25–31 Aug 2026, 06:00–21:00, ~10 min interval) into
 heavy-truck sightings, checks them against the inner-Bangkok truck-ban windows, and shows the result in a dashboard.
 
+## Repository layout (one folder per role)
+
+| Folder | Role / owner | Contents |
+|---|---|---|
+| `scraping/` | Web scraping — เพา | geocoding, ban zone, (TODO) weather, official rules, BMA camera list — see `scraping/README.md` |
+| `pipeline/` | Data engineering — เก้อ | clean → detect → classify → ban rules |
+| `config/` | Data engineering | `ban_rules.json`, `ban_zone.geojson` |
+| `modeling/` | Data science — พัท | hand labels, training (`train_gpu.py` on RTX 3090), model evaluation |
+| `analysis/` | Data science — พัท | EDA notebook (`eda_cctv.ipynb` / `.html`) |
+| `dashboard/` | BI — เต้ | Streamlit app, violation time-lapse clip |
+| `insights/` | Insights — ม่อน | findings + limitations write-up |
+| `docs/` | PM — ฟีฟ่า | architecture diagram + data contracts (`docs/architecture.md`), slides, video |
+| `data_out/` | shared | stage outputs = contracts between folders (see `docs/architecture.md`) |
+
+Owners are listed in `.github/CODEOWNERS` (fill in GitHub usernames). Work on a branch and open a PR.
+
 ## Pipeline
 
 | Stage | Script | Model / method | Output | Time (M4 Pro) |
 |---|---|---|---|---|
-| 1. Clean + EDA | `extract_features.py`, `eda_cctv.ipynb` | filename parsing, image stats | `data_out/images_clean.csv` (60,782 valid) | 20 s |
+| 1. Clean + EDA | `pipeline/extract_features.py`, `analysis/eda_cctv.ipynb` | filename parsing, image stats | `data_out/images_clean.csv` (60,782 valid) | 20 s |
 | 2. Detect vehicles | `pipeline/detect.py` | YOLO11s → CoreML fp16 on Neural Engine | `data_out/detections.parquet` (526,748 boxes) | 3.5 min |
-| 3. Classify size | `pipeline/classify_trucks.py` (candidates + zero-shot), `pipeline/classify_vit.py` (final class) | CLIP ViT-B/16 (DataComp-XL) fine-tuned end-to-end on RTX 3090 (`pipeline/train_gpu.py`) with Thai-vehicles crops degraded to CCTV quality + 450 hand labels | `data_out/vehicles.parquet` | 8.5 min embed + inference |
-| 4. Ban rules + aggregate | `pipeline/rules.py`, `config/ban_rules.json` | static-object filter, weekday/ban windows | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` | 5 s |
-| 5. Dashboard | `dashboard/app.py` | Streamlit + Plotly | — | — |
-| 6. Camera map + ban zone | `pipeline/geocode_cameras.py`, `pipeline/build_ban_zone.py` | Nominatim geocoding of camera landmarks; zone ≈ inside Ratchadaphisek ring road (+400 m) — **approximate, not the official map** | `data_out/cameras_geo.csv`, `config/ban_zone.geojson` | ~3 min |
-| 7. Violation clip | `viz/make_timelapse.py` | matplotlib + ffmpeg; only weekday 6-wheel ban windows, only trucks inside the zone | `data_out/truck_violations.mp4` (1080p, 40 s) | 1 min |
+| 3a. Candidates | `pipeline/classify_trucks.py embed` | truck/bus/large-car boxes + CLIP zero-shot scores | `data_out/candidates.parquet` | 8.5 min |
+| 3b. Classify size | `pipeline/classify_vit.py` | CLIP ViT-B/16 (DataComp-XL) fine-tuned end-to-end on RTX 3090 (`modeling/train_gpu.py`) with Thai-vehicles crops degraded to CCTV quality + 450 hand labels | `data_out/vehicles.parquet` | 12 min |
+| 4. Camera map + ban zone | `scraping/geocode_cameras.py`, `scraping/build_ban_zone.py` | Nominatim geocoding of camera landmarks; zone ≈ inside Ratchadaphisek ring road (+400 m) — **approximate, not the official map** | `data_out/cameras_geo.csv`, `config/ban_zone.geojson` | ~3 min |
+| 5. Ban rules + aggregate | `pipeline/rules.py`, `config/ban_rules.json` | static-object filter, weekday/ban windows, in-zone only | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` | 5 s |
+| 6. Dashboard | `dashboard/app.py` | Streamlit + Plotly | — | — |
+| 7. Violation clip | `dashboard/make_timelapse.py` | matplotlib + ffmpeg; only weekday 6-wheel ban windows, only trucks inside the zone | `data_out/truck_violations.mp4` (1080p, 40 s) | 1 min |
 
-Ban flags apply only to cameras inside the zone (94/100); run `build_ban_zone.py` before `rules.py`.
+Ban flags apply only to cameras inside the zone (94/100); run `scraping/build_ban_zone.py` before `pipeline/rules.py`.
+Run everything from the repo root.
 
 ```bash
-# envs: .venv (py3.14: pandas, open_clip, sklearn, streamlit) and .venv312 (py3.12, CoreML: pipeline/requirements-coreml.txt)
-python extract_features.py data/cctv_images data_out/features.csv            # then run eda_cctv.ipynb
+# envs: .venv (requirements.txt) and .venv312 (Python 3.12, CoreML: pipeline/requirements-coreml.txt)
+python pipeline/extract_features.py data/cctv_images data_out/features.csv      # then run analysis/eda_cctv.ipynb
 .venv312/bin/python pipeline/detect.py data_out/images_clean.csv data_out/detections.parquet
 .venv312/bin/python pipeline/classify_trucks.py embed data_out/detections.parquet data_out/candidates
-python pipeline/classify_trucks.py train data_out/candidates labels/labels.csv models/truck_probe.joblib
-python pipeline/classify_trucks.py predict data_out/candidates models/truck_probe.joblib data_out/vehicles.parquet
+python pipeline/classify_vit.py data_out/candidates.parquet models/truck_clipvitb.pt data_out/vehicles.parquet
+python scraping/geocode_cameras.py && python scraping/build_ban_zone.py
 python pipeline/rules.py
 streamlit run dashboard/app.py
+python dashboard/make_timelapse.py --fps 6
 ```
+
+Not in git (too large): raw images (`data/cctv_images`), the Thai-vehicles dataset zip, embeddings/caches, and model
+weights (`models/truck_clipvitb.pt`, 343 MB — retrain with `modeling/train_gpu.py` or ask the PM for the file).
 
 ## Model quality (be honest about it)
 
@@ -35,7 +57,7 @@ streamlit run dashboard/app.py
   zero-shot CLIP 0.39 / – · YOLOE zero-shot 0.45–0.50 · CLIP linear probe 0.64 / 0.55 (p≥0.6) ·
   EfficientNet-B0 0.60 / 0.52 · ConvNeXt-V2-T 0.58 / 0.62 · DINOv2 ViT-B 0.64 / 0.55 ·
   **CLIP ViT-B/16 fine-tuned 0.65 / 0.69 (p≥0.6) ← used**. Small holdout (29 heavy) → differences of ±0.05 are noise.
-  Labels in `labels/labels.csv`; Thai data: Roboflow "Thailand-vehicles-2024-01-16" (CC BY 4.0).
+  Labels in `modeling/labels/labels.csv`; Thai data: Roboflow "Thailand-vehicles-2024-01-16" (CC BY 4.0).
 - 6- vs 10-wheel cannot be separated reliably at 352×288 → all heavy trucks use the 6-wheel ban windows.
 - Main confusions: passenger vans/minibuses, box-body pickups (4-wheel), partially visible buses.
 - Use the numbers to compare hours and cameras, **not** as evidence against individual vehicles (no plates readable).
@@ -49,10 +71,9 @@ streamlit run dashboard/app.py
 - In-zone cameras, ratio of (ban hours / 10–14h) weekday vs weekend = **0.94 (95% bootstrap CI 0.82–1.08)** →
   no clear extra drop in ban hours beyond the normal daily rhythm. Only 2 weekend days, so weak evidence either way.
 - Cameras with most in-zone ban-window sightings: 11, 75, 68, 26, 32, 188 (camera 11 still mixes in passenger vans).
-- Old CLIP-probe results are kept in `data_out/vehicles_clipprobe.parquet` for comparison.
 
 ## Next
 
-- Camera coordinates (scrape BMA camera list) → `data_out/cameras_geo.csv` enables the map.
-- More labels / fine-tune a small CNN on crops to raise precision.
-- Join weather (rain), holidays, road type for the scraping requirement.
+- `scraping/`: weather, official ban rules/zone, BMA camera list (required: ≥3 sources or 1 with Playwright).
+- `pipeline/`: one-command end-to-end run (Makefile / Prefect) and join of scraped data.
+- `insights/` + `docs/`: findings, slides, 15-min video, submission by Sun 6 Dec 2026.

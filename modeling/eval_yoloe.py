@@ -1,10 +1,10 @@
-"""Zero-shot test: YOLOE (open-vocabulary detector) with text prompts vs our hand labels (labels/labels.csv).
+"""Zero-shot test: YOLOE (open-vocabulary detector) with text prompts vs our hand labels (modeling/labels/labels.csv).
 
 For every labelled box, YOLOE runs on the full frame; the YOLOE box with the highest IoU (>= 0.4) to the labelled
 box gives the predicted prompt, mapped to light / bus / heavy. No matching box -> "other".
 Compared with the current CLIP linear probe (5-fold CV) on the same 450 labels.
 
-Usage: python pipeline/eval_yoloe.py [--model models/yoloe-11l-seg.pt] [--conf 0.05]
+Usage: python modeling/eval_yoloe.py [--model models/yoloe-11l-seg.pt] [--conf 0.05]
 """
 import argparse
 import time
@@ -34,7 +34,7 @@ def main():
     ap.add_argument("--model", default="models/yoloe-11l-seg.pt")
     ap.add_argument("--conf", type=float, default=0.05)
     a = ap.parse_args()
-    lab = pd.read_csv("labels/labels.csv")
+    lab = pd.read_csv("modeling/labels/labels.csv")
     names = [p for g in PROMPTS.values() for p in g]
     group = {p: g for g, ps in PROMPTS.items() for p in ps}
     dev = "mps" if torch.backends.mps.is_available() else "cpu"

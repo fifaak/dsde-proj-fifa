@@ -1,6 +1,6 @@
 """Stage 3 (current): classify candidate boxes with the fine-tuned CLIP ViT-B/16 (DataComp-XL) crop classifier.
 
-Model: vit_base_patch16_clip_224.datacompxl fine-tuned end-to-end on the RTX 3090 (pipeline/train_gpu.py) with
+Model: vit_base_patch16_clip_224.datacompxl fine-tuned end-to-end on the RTX 3090 (modeling/train_gpu.py) with
 Thai-vehicles crops degraded to CCTV quality + our 450 hand labels. Holdout (90 of our labels, same split for all
 models): heavy precision 0.65 / recall 0.69 at p_heavy >= 0.6, vs 0.64 / 0.55 for the old CLIP linear probe.
 
@@ -24,6 +24,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "modeling"))  # training code lives in modeling/
 sys.path.insert(0, str(Path(__file__).parent))
 from prep_gpu_data import square_u8  # noqa: E402
 from train_cnn import crop_box  # noqa: E402

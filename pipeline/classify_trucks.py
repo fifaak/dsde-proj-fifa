@@ -18,7 +18,7 @@ Text embeddings are always computed with open_clip in PyTorch (tiny).
 Usage
     python pipeline/classify_trucks.py embed <detections.parquet> <out_prefix> [--backend coreml]
         -> <out_prefix>.parquet (candidate rows + zero-shot probs) and <out_prefix>_emb.npy (L2-normed embeddings)
-    python pipeline/classify_trucks.py train <out_prefix> labels/labels.csv models/truck_probe.joblib
+    python pipeline/classify_trucks.py train <out_prefix> modeling/labels/labels.csv models/truck_probe.joblib
     python pipeline/classify_trucks.py predict <out_prefix> models/truck_probe.joblib data_out/vehicles.parquet
 
 Zero-shot alone was poor on these crops (heavy precision 0.39 on a 250-crop hand-labelled sample), so the final

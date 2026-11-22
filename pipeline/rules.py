@@ -54,7 +54,7 @@ def main():
           f"({heavy[heavy.static].camera_id.nunique()} cameras)")
     heavy = heavy[~heavy.static].drop(columns=["static", "loc_frames"])
 
-    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see pipeline/build_ban_zone.py)
+    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see scraping/build_ban_zone.py)
     holidays = set(cfg["public_holidays"])
     geo_path = OUT / "cameras_geo.csv"
     zone = (pd.read_csv(geo_path).set_index("camera_id").in_zone if geo_path.exists() and
