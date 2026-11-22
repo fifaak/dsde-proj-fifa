@@ -15,7 +15,7 @@ Outputs
   data_out/heavy_sightings.parquet   one row per heavy-truck sighting with ban flags
   data_out/agg_camera_hour.csv       camera x date x hour table (all frames, zeros included)
 
-Usage: python pipeline/rules.py
+Usage: python "pipeline (เก้อ)/rules.py"
 """
 import json
 from pathlib import Path
@@ -54,7 +54,7 @@ def main():
           f"({heavy[heavy.static].camera_id.nunique()} cameras)")
     heavy = heavy[~heavy.static].drop(columns=["static", "loc_frames"])
 
-    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see scraping/build_ban_zone.py)
+    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see scraping (เพา)/build_ban_zone.py)
     holidays = set(cfg["public_holidays"])
     geo_path = OUT / "cameras_geo.csv"
     zone = (pd.read_csv(geo_path).set_index("camera_id").in_zone if geo_path.exists() and

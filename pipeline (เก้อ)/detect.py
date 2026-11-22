@@ -6,8 +6,8 @@ Backends
   torch                            - Ultralytics PyTorch model on MPS/CUDA/CPU, fp16 (portable fallback).
 
 Usage
-  python pipeline/detect.py <images_clean.csv> <out.parquet> [--backend coreml --model models/yolo11s_nonms.mlpackage]
-  python pipeline/detect.py <images_clean.csv> <out.parquet> --backend torch --model models/yolo11s.pt
+  python "pipeline (เก้อ)/detect.py" <images_clean.csv> <out.parquet> [--backend coreml --model models/yolo11s_nonms.mlpackage]
+  python "pipeline (เก้อ)/detect.py" <images_clean.csv> <out.parquet> --backend torch --model models/yolo11s.pt
 
   CoreML export (needs Python <=3.12, torch 2.7, coremltools 8):
     YOLO("yolo11s.pt").export(format="coreml", imgsz=640, nms=False, half=True)

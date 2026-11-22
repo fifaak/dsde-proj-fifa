@@ -16,10 +16,10 @@ Backends: coreml (image encoder on the Apple Neural Engine, ~260 crops/s on M4 P
 Text embeddings are always computed with open_clip in PyTorch (tiny).
 
 Usage
-    python pipeline/classify_trucks.py embed <detections.parquet> <out_prefix> [--backend coreml]
+    python "pipeline (เก้อ)/classify_trucks.py" embed <detections.parquet> <out_prefix> [--backend coreml]
         -> <out_prefix>.parquet (candidate rows + zero-shot probs) and <out_prefix>_emb.npy (L2-normed embeddings)
-    python pipeline/classify_trucks.py train <out_prefix> modeling/labels/labels.csv models/truck_probe.joblib
-    python pipeline/classify_trucks.py predict <out_prefix> models/truck_probe.joblib data_out/vehicles.parquet
+    python "pipeline (เก้อ)/classify_trucks.py" train <out_prefix> modeling (พัท)/labels/labels.csv models/truck_probe.joblib
+    python "pipeline (เก้อ)/classify_trucks.py" predict <out_prefix> models/truck_probe.joblib data_out/vehicles.parquet
 
 Zero-shot alone was poor on these crops (heavy precision 0.39 on a 250-crop hand-labelled sample), so the final
 class comes from a linear probe trained on hand labels (see labels/README.md for CV numbers).

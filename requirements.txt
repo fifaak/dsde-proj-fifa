@@ -1,5 +1,5 @@
 # main environment (Python 3.12+; tested on 3.14, Apple Silicon)
-# CoreML detection/embedding steps use a separate Python 3.12 env: pipeline/requirements-coreml.txt
+# CoreML detection/embedding steps use a separate Python 3.12 env: pipeline (เก้อ)/requirements-coreml.txt
 numpy
 pandas
 pyarrow

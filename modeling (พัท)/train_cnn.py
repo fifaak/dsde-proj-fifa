@@ -1,11 +1,11 @@
 """Fine-tune a small CNN (EfficientNet-B0, ImageNet weights) to classify candidate crops as light/bus/heavy/other.
 
 Training data: Thai dataset crops (degraded on the fly to CCTV quality every epoch, see thai_crops.py) +
-our hand-labelled CCTV crops (modeling/labels/labels.csv, up-weighted). Evaluation: 5-fold CV over OUR labels
+our hand-labelled CCTV crops (modeling (พัท)/labels/labels.csv, up-weighted). Evaluation: 5-fold CV over OUR labels
 (Thai data always in train), so numbers are comparable with the CLIP probe (heavy P 0.66 / R 0.67).
 
-Usage: python modeling/train_cnn.py cv --thai-dir <thai_dataset_dir> [--folds 1] [--no-thai]   # evaluate
-       python modeling/train_cnn.py fit models/truck_cnn.pt --thai-dir <thai_dataset_dir>  # train on all, save
+Usage: python "modeling (พัท)/train_cnn.py" cv --thai-dir <thai_dataset_dir> [--folds 1] [--no-thai]   # evaluate
+       python "modeling (พัท)/train_cnn.py" fit models/truck_cnn.pt --thai-dir <thai_dataset_dir>  # train on all, save
 """
 import argparse
 import os

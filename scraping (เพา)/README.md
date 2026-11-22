@@ -1,6 +1,6 @@
-# scraping/ — web scraping (required task)
+# scraping (เพา)/ — web scraping (required task)
 
-Course rule: **≥3 sources** with simple scraping/APIs, or **1 source** that needs Playwright/Selenium/Crawlee.
+Course rule: **≥3 sources** with simple scraping (เพา)/APIs, or **1 source** that needs Playwright/Selenium/Crawlee.
 This part does not count toward Data Engineering.
 
 | Source | Status | Script | Output |
@@ -11,5 +11,5 @@ This part does not count toward Data Engineering.
 | Official truck-ban rules/zone (police traffic division / BMA announcement) | TODO | | replace `config/ban_rules.json`, `config/ban_zone.geojson` |
 | BMA Traffic camera list with coordinates (Playwright; needs a Thai IP) | TODO | | replace `data_out/cameras_geo.csv` (same columns) |
 
-Keep output columns as listed so `pipeline/rules.py` and the dashboard keep working.
+Keep output columns as listed so `pipeline (เก้อ)/rules.py` and the dashboard keep working.
 Nominatim policy: ≤1 request/s, results cached in `data_out/geocode_cache.json`.

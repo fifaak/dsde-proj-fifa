@@ -1,10 +1,10 @@
-"""Zero-shot test: YOLOE (open-vocabulary detector) with text prompts vs our hand labels (modeling/labels/labels.csv).
+"""Zero-shot test: YOLOE (open-vocabulary detector) with text prompts vs our hand labels (modeling (พัท)/labels/labels.csv).
 
 For every labelled box, YOLOE runs on the full frame; the YOLOE box with the highest IoU (>= 0.4) to the labelled
 box gives the predicted prompt, mapped to light / bus / heavy. No matching box -> "other".
 Compared with the current CLIP linear probe (5-fold CV) on the same 450 labels.
 
-Usage: python modeling/eval_yoloe.py [--model models/yoloe-11l-seg.pt] [--conf 0.05]
+Usage: python "modeling (พัท)/eval_yoloe.py" [--model models/yoloe-11l-seg.pt] [--conf 0.05]
 """
 import argparse
 import time

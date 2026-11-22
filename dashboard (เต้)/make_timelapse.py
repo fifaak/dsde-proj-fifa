@@ -9,7 +9,7 @@ Each frame = one 10-min slot.
 Slots where fewer than 50 cameras reported (system outage 27 Aug morning) are skipped, and so are windows left
 with fewer than 6 slots.
 
-Usage:  python dashboard/make_timelapse.py [--fps 6] [--out data_out/truck_violations.mp4] [--png-only 5 30 ...]
+Usage:  python "dashboard (เต้)/make_timelapse.py" [--fps 6] [--out data_out/truck_violations.mp4] [--png-only 5 30 ...]
 Basemap: Esri World Dark Gray Canvas (© Esri, HERE, Garmin, © OpenStreetMap contributors), cached on first run.
 """
 import argparse

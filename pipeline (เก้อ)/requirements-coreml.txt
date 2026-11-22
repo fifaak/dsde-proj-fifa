@@ -1,0 +1,11 @@
+# Environment for pipeline (เก้อ)/detect.py --backend coreml (Apple Silicon Neural Engine).
+# coremltools has no native build for Python 3.14 and is only tested up to torch 2.7, so use Python 3.12:
+#   uv venv --python 3.12 .venv312 && uv pip install --python .venv312/bin/python -r "pipeline (เก้อ)/requirements-coreml.txt"
+torch==2.7.0
+torchvision==0.22.0
+coremltools==8.3.0
+numpy<2
+pyarrow==17.0.0
+pandas
+pillow
+ultralytics

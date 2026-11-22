@@ -1,7 +1,7 @@
-# insights/ — findings
+# insights (ม่อน)/ — findings
 
 Write-up of what the analysis shows, for the slides and the video. Raw numbers are in the root `README.md`
-("First results"); figures can be exported from the dashboard or `analysis/`.
+("First results"); figures can be exported from the dashboard or `analysis (พัท)/`.
 
 ## Draft findings (to refine)
 
@@ -19,5 +19,5 @@ Write-up of what the analysis shows, for the slides and the video. Raw numbers a
 
 ## TODO
 
-- Join weather (rain) and official rules once `scraping/` delivers them.
+- Join weather (rain) and official rules once `scraping (เพา)/` delivers them.
 - 3–5 headline insights + recommendations (where/when to enforce).

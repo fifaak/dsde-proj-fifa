@@ -5,7 +5,7 @@ map was available here. As a stand-in, the zone is the area enclosed by the Ratc
 (ถนนวงแหวนรัชดาภิเษก), traced through junctions geocoded with OpenStreetMap Nominatim, buffered 400 m so cameras
 on the ring road itself count as inside. Replace config/ban_zone.geojson with the official polygon when available.
 
-Usage: python scraping/build_ban_zone.py   (uses data_out/geocode_cache.json, 1 req/s to Nominatim for new names)
+Usage: python "scraping (เพา)/build_ban_zone.py"   (uses data_out/geocode_cache.json, 1 req/s to Nominatim for new names)
 Output: config/ban_zone.geojson, data_out/cameras_geo.csv gains column in_zone
 """
 import json

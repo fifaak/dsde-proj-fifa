@@ -4,7 +4,7 @@ Thai crops get one freshly degraded variant per epoch (CCTV-like: 24-70 px, JPEG
 resized to 128 px; our 450 labelled CCTV crops are rendered once. Everything is uint8 so the whole set fits in
 GPU memory and training needs no CPU data loading.
 
-Usage: python modeling/prep_gpu_data.py <thai_dataset_dir> data_out/gpu [--epochs 8]
+Usage: python "modeling (พัท)/prep_gpu_data.py" <thai_dataset_dir> data_out/gpu [--epochs 8]
 Output: thai_x.npy (E, N, 128, 128, 3) uint8, thai_y.npy, ours_x.npy (450, 128, 128, 3) uint8, ours_y.npy
 """
 import argparse

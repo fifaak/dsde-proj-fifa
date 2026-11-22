@@ -5,7 +5,7 @@ hand-written landmark query (intersection / footbridge landmark / soi) parsed fr
 landmark-level (~50-300 m), good enough for a city map, not for lane-level placement. Replace with the official
 BMA camera coordinates when available (same output format).
 
-Usage: python scraping/geocode_cameras.py  -> data_out/cameras_geo.csv (camera_id, lat, lon, query, osm_name, method)
+Usage: python "scraping (เพา)/geocode_cameras.py"  -> data_out/cameras_geo.csv (camera_id, lat, lon, query, osm_name, method)
 Nominatim policy: max 1 request/s, results cached in data_out/geocode_cache.json.
 """
 import json

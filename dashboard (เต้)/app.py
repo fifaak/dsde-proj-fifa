@@ -1,6 +1,6 @@
 """Bangkok truck-ban monitoring dashboard (Streamlit).
 
-Run from the project root:  streamlit run dashboard/app.py
+Run from the project root:  streamlit run "dashboard (เต้)/app.py"
 Reads data_out/agg_camera_hour.csv, data_out/heavy_sightings.parquet, config/ban_rules.json,
 and (optional) data_out/cameras_geo.csv with columns camera_id, lat, lon for the map.
 """

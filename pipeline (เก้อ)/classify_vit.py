@@ -1,6 +1,6 @@
 """Stage 3 (current): classify candidate boxes with the fine-tuned CLIP ViT-B/16 (DataComp-XL) crop classifier.
 
-Model: vit_base_patch16_clip_224.datacompxl fine-tuned end-to-end on the RTX 3090 (modeling/train_gpu.py) with
+Model: vit_base_patch16_clip_224.datacompxl fine-tuned end-to-end on the RTX 3090 (modeling (พัท)/train_gpu.py) with
 Thai-vehicles crops degraded to CCTV quality + our 450 hand labels. Holdout (90 of our labels, same split for all
 models): heavy precision 0.65 / recall 0.69 at p_heavy >= 0.6, vs 0.64 / 0.55 for the old CLIP linear probe.
 
@@ -9,7 +9,7 @@ bilinear to 224 px and CLIP mean/std normalisation.
 Decision: vclass = heavy if p_heavy >= HEAVY_TH, else the most likely of the other classes.
 heavy_type (truck6 / truck10) still comes from the zero-shot CLIP scores in candidates.parquet (unvalidated).
 
-Usage: python pipeline/classify_vit.py data_out/candidates.parquet models/truck_clipvitb.pt data_out/vehicles.parquet
+Usage: python "pipeline (เก้อ)/classify_vit.py" data_out/candidates.parquet models/truck_clipvitb.pt data_out/vehicles.parquet
 """
 import os
 import sys
@@ -24,7 +24,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "modeling"))  # training code lives in modeling/
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "modeling (พัท)"))  # training code lives in modeling (พัท)/
 sys.path.insert(0, str(Path(__file__).parent))
 from prep_gpu_data import square_u8  # noqa: E402
 from train_cnn import crop_box  # noqa: E402

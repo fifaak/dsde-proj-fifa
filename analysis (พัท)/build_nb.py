@@ -12,7 +12,7 @@ md("""
 2110403 DSDE-CEDT project (2026/1). Raw dataset: `cctv_images/<camera_id>/<camera_id>_<name>_<location>_<YYYYMMDD>_<HHMMSS>.jpg`.
 
 Steps:
-1. Parse filenames into metadata and compute cheap per-image quality features (`pipeline/extract_features.py`).
+1. Parse filenames into metadata and compute cheap per-image quality features (`pipeline (เก้อ)/extract_features.py`).
 2. Coverage: cameras, days, hours, capture interval, gaps/outages.
 3. Image properties: resolution, file size.
 4. Data quality: placeholder frames, test patterns, dark/blurred/stale frames, clock-overlay mismatch.
@@ -27,7 +27,7 @@ import numpy as np, pandas as pd
 import matplotlib.pyplot as plt, seaborn as sns
 from PIL import Image
 
-ROOT = Path.cwd().parent if Path.cwd().name == "analysis" else Path.cwd()   # repo root
+ROOT = Path.cwd().parent if Path.cwd().name.startswith("analysis") else Path.cwd()   # repo root
 DATA_DIR = ROOT / "data/cctv_images"      # <-- set to the extracted zip folder
 FEAT_CSV = ROOT / "data_out/features.csv"
 OUT_DIR  = ROOT / "data_out"; OUT_DIR.mkdir(exist_ok=True)

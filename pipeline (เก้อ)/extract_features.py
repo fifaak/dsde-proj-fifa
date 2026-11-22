@@ -1,6 +1,6 @@
 """Build a per-image metadata + quality feature table from the raw CCTV image folder.
 
-Usage: python pipeline/extract_features.py <cctv_images_dir> <out_csv>
+Usage: python "pipeline (เก้อ)/extract_features.py" <cctv_images_dir> <out_csv>
 
 Filename pattern: <camera_id>_<camera_name>_<location>_<YYYYMMDD>_<HHMMSS>.jpg
 Features are computed on a downscaled grayscale/HSV copy for speed.
