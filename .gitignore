@@ -1,0 +1,25 @@
+# raw data / local links (raw CCTV zip: 1.6 GB, Thai dataset zip: 1.7 GB — keep outside git)
+data
+data/
+models/*
+!models/truck_probe.joblib
+mobileclip_blt.ts
+.claude/
+__pycache__/
+*.pyc
+.DS_Store
+.venv*/
+
+# data_out: keep only small results needed by the dashboard / rules / clip
+data_out/*
+!data_out/images_clean.csv
+!data_out/detections.parquet
+!data_out/candidates.parquet
+!data_out/vehicles.parquet
+!data_out/heavy_sightings.parquet
+!data_out/agg_camera_hour.csv
+!data_out/cameras.csv
+!data_out/cameras_geo.csv
+!data_out/geocode_cache.json
+!data_out/yoloe_eval.csv
+!data_out/truck_violations.mp4

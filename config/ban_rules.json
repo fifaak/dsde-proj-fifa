@@ -1,0 +1,11 @@
+{
+  "_source": "Bangkok inner-zone truck ban as commonly published (police/BMA announcements). VERIFY against the official announcement before final analysis; some roads/expressways have different rules.",
+  "applies_on": "weekdays_except_public_holidays",
+  "public_holidays": [],
+  "rules": {
+    "truck6": [["06:00", "09:00"], ["16:00", "20:00"]],
+    "truck10": [["06:00", "10:00"], ["15:00", "21:00"]]
+  },
+  "heavy_rule_for_analysis": "truck6",
+  "_note": "Classifier cannot reliably separate 6 vs 10 wheels at 352x288, so the main analysis treats every heavy truck with the 6-wheel windows (which every 10-wheel truck must also obey). truck10 windows are reported separately using the unvalidated zero-shot sub-type."
+}

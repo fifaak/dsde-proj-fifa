@@ -1,0 +1,23 @@
+# main environment (Python 3.12+; tested on 3.14, Apple Silicon)
+# CoreML detection/embedding steps use a separate Python 3.12 env: pipeline/requirements-coreml.txt
+numpy
+pandas
+pyarrow
+pillow
+matplotlib
+seaborn
+scikit-learn
+joblib
+torch
+torchvision
+timm
+ultralytics
+open_clip_torch
+shapely
+contextily
+imageio-ffmpeg
+streamlit
+plotly
+jupyter
+nbformat
+nbconvert
