@@ -19,6 +19,9 @@ heavy-truck sightings, checks them against the inner-Bangkok truck-ban windows, 
 
 Owners are listed in `.github/CODEOWNERS` (fill in GitHub usernames). Work on a branch and open a PR.
 
+**Remaining work:** each role folder has a `TODO.md` checklist mapped to the course criteria; timeline and
+submission checklist are in `docs (ฟีฟ่า)/TODO.md` (deadline Sun 6 Dec 2026).
+
 ## Pipeline
 
 | Stage | Script | Model / method | Output | Time (M4 Pro) |
