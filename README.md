@@ -59,9 +59,15 @@ and `clip_ViT-B-16.mlpackage`. Fetch them all with:
 bash models/download.sh
 ```
 
-The release also holds `candidates_emb.npy` (CLIP embeddings of the candidate crops, 117 MB).
+The same release holds the raw CCTV images (`cctv_images.zip`, 61,319 images, 1.6 GB). Fetch them into
+`data/cctv_images/` along with the weights:
 
-Not in git or the release: raw images (`data/cctv_images`, 1.6 GB, course data) and the Thai-vehicles dataset zip.
+```bash
+bash models/download.sh --data
+```
+
+It also holds `candidates_emb.npy` (CLIP embeddings of the candidate crops, 117 MB). Not published: the Thai-vehicles
+dataset zip (get it from Roboflow, Thailand-vehicles-2024).
 
 ## Model quality (be honest about it)
 
