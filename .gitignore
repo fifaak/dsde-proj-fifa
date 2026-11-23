@@ -23,3 +23,6 @@ data_out/*
 !data_out/geocode_cache.json
 !data_out/yoloe_eval.csv
 !data_out/truck_violations.mp4
+!models/download.sh
+!data_out/features.csv
+!data_out/thai.parquet

@@ -50,8 +50,18 @@ streamlit run "dashboard (เต้)/app.py"
 python "dashboard (เต้)/make_timelapse.py" --fps 6
 ```
 
-Not in git (too large): raw images (`data/cctv_images`), the Thai-vehicles dataset zip, embeddings/caches, and model
-weights (`models/truck_clipvitb.pt`, 343 MB — retrain with `modeling (พัท)/train_gpu.py` or ask the PM for the file).
+**Model weights** are in the GitHub Release
+[`models-v1`](https://github.com/fifaak/dsde-proj-fifa/releases/tag/models-v1) (git caps files at 100 MB):
+`truck_clipvitb.pt` (fine-tuned CLIP ViT-B, 343 MB), `yolo11s.pt`, and the CoreML packages `yolo11s_nonms.mlpackage`
+and `clip_ViT-B-16.mlpackage`. Fetch them all with:
+
+```bash
+bash models/download.sh
+```
+
+The release also holds `candidates_emb.npy` (CLIP embeddings of the candidate crops, 117 MB).
+
+Not in git or the release: raw images (`data/cctv_images`, 1.6 GB, course data) and the Thai-vehicles dataset zip.
 
 ## Model quality (be honest about it)
 
