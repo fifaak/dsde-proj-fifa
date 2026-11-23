@@ -3,6 +3,15 @@
 Write-up of what the analysis shows, for the slides and the video. Raw numbers are in the root `README.md`
 ("First results"); figures can be exported from the dashboard or `analysis (พัท)/`.
 
+## Evidence images
+
+`evidence/` = 49 CCTV frames of heavy trucks **inside the ban zone during weekday ban windows** (top 10 cameras,
+up to 5 different ban windows each, model confidence p ≥ 0.95), trucks boxed in red, with a caption.
+`evidence/index.csv` lists camera, place, time and confidence; `evidence/contact_sheet.jpg` shows all of them.
+Regenerate with `python "insights (ม่อน)/make_evidence.py"` (needs the raw images locally).
+These are model detections, not verified violations: check each image before using it as an example.
+The full list of 3,014 sightings is `data_out/heavy_sightings.parquet` (rows with `in_ban6 == True`).
+
 ## Draft findings (to refine)
 
 1. **Trucks follow the daily rhythm, not the ban.** In-zone weekday ban hours vs 10–14h, compared with the weekend:
