@@ -3,19 +3,30 @@
 **Criterion:** Component 3, BI Dashboard. Also the demo part of the video.
 **Target date:** Thu 3 Dec 2026.
 
+## Run locally
+
+Run from the dashboard folder to load its bundled theme.
+
+```bash
+cd "dashboard (เต้)"
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
 ## Status
 
-- [x] Streamlit app (`app.py`): KPIs, hourly chart with ban windows, camera × hour heatmap, camera ranking,
-      map, evidence gallery
-- [x] Violation time-lapse clip (`make_timelapse.py` → `data_out/truck_violations.mp4`)
+- [x] Streamlit app with KPIs, a zone map and 10-minute time slider, hourly profile, camera × hour heatmap, and rankings
+- [x] Filters for date, camera, day type, zone, and model confidence
+- [x] Gallery uses the evidence pack already in the repository, with local CCTV crops when available
+- [x] Hourly chart accepts `rain_mm` in the aggregated table or `data_out/weather_hourly.csv`
+- [x] Demo script for the video (`demo.md`)
+- [x] Time-lapse clip (`make_timelapse.py` → `data_out/truck_violations.mp4`)
 
 ## Remaining
 
-- [ ] **Deploy** (e.g. Streamlit Community Cloud) so graders can open it. Needs the data files in the repo and
-      relative paths (see `pipeline (เก้อ)/TODO.md`). For the gallery, commit a small set of evidence crops
-      instead of the raw images.
-- [ ] **Add scraped data**: rain overlay on the hourly chart, official zone on the map, real camera positions
-- [ ] Filters: inside/outside zone, weekday/weekend, model-confidence threshold
-- [ ] Optional: hour slider on the map (an in-app version of the clip)
-- [ ] **Demo script** (2–3 min) for the video, plus screenshots for the slides
-- [ ] Re-render the clip after the official zone / camera coordinates arrive
+- [ ] Validate rainfall, the official zone and real camera positions after scraping and pipeline integration.
+      Check that the map, ranking, and clip use the same integrated data.
+- [ ] Re-render the clip once the official zone and camera coordinates arrive.
+- [ ] Refresh screenshots for the final slides after the data update.
+- [ ] Deploy the dashboard and verify the link from a viewer session. The entry point is `dashboard (เต้)/app.py`;
+      its dependencies are in `dashboard (เต้)/requirements.txt`.
