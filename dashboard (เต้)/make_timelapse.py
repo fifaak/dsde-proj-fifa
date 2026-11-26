@@ -1,11 +1,10 @@
-"""Violation clip: heavy trucks (6+ wheels) seen INSIDE the ban zone DURING weekday 6-wheel ban windows.
+"""Heavy-truck sightings in the study area during the project's weekday 6-wheel reference windows.
 
-Only ban windows are shown (06:00-09:00 and 16:00-20:00 on weekdays); allowed hours and weekends are skipped.
-Each frame = one 10-min slot.
-  map    ban zone outline; red dots = violations at a camera, size = violations accumulated in this ban window
-         (bright = seen in this slot, faded = earlier in the window), so hotspots build up over the window
-  right  big counter for the current window + top-5 cameras in this window
-  bottom timeline of all ban windows of the week, bar = violations per slot, cursor = now
+Each frame is one observed 10-minute slot inside a reference window.
+  map    zone outline; red dots show sightings at a camera, sized by the running total in the window
+         (bright = seen in this slot, faded = earlier in the window)
+  right  running total and five cameras with the most sightings in the window
+  bottom timeline with sightings per slot and a cursor for the displayed time
 Slots where fewer than 50 cameras reported (system outage 27 Aug morning) are skipped, and so are windows left
 with fewer than 6 slots.
 
@@ -22,10 +21,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.animation import FFMpegWriter
+from matplotlib.font_manager import fontManager
 from matplotlib.patches import Polygon as MplPolygon
 
-matplotlib.rcParams["font.family"] = ["Sukhumvit Set", "DejaVu Sans"]
-OUT = Path("data_out")
+font_names = {font.name for font in fontManager.ttflist}
+preferred_fonts = ("Sukhumvit Set", "Leelawadee UI", "Noto Sans Thai", "Tahoma", "DejaVu Sans")
+matplotlib.rcParams["font.family"] = [font for font in preferred_fonts if font in font_names]
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "data_out"
 THAI_DAYS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
 BG, FG, MUTED, RED = "#0e1117", "#e6e6e6", "#8a8f98", "#ff3b30"
 TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
@@ -45,8 +48,10 @@ def to_min(hhmm):
 
 
 def load():
-    cfg = json.loads(Path("config/ban_rules.json").read_text())
-    ring = np.array(json.loads(Path("config/ban_zone.geojson").read_text())["features"][0]["geometry"]["coordinates"][0])
+    cfg = json.loads((ROOT / "config/ban_rules.json").read_text(encoding="utf-8"))
+    zone = json.loads((ROOT / "config/ban_zone.geojson").read_text(encoding="utf-8"))["features"][0]
+    ring = np.array(zone["geometry"]["coordinates"][0])
+    approximate = bool(zone.get("properties", {}).get("approximate"))
     imgs = pd.read_csv(OUT / "images_clean.csv", parse_dates=["timestamp"])
     sight = pd.read_parquet(OUT / "heavy_sightings.parquet")
     geo = pd.read_csv(OUT / "cameras_geo.csv")
@@ -77,7 +82,7 @@ def load():
     v["slot"] = pd.to_datetime(v.timestamp).dt.floor("10min")
     per_slot_cam = v.groupby(["slot", "camera_id"]).size()
     per_slot = v.groupby("slot").size().reindex(slots.slot, fill_value=0).values
-    return ring, slots, per_slot_cam, per_slot, geo, names
+    return ring, slots, per_slot_cam, per_slot, geo, names, windows, approximate
 
 
 def main():
@@ -86,7 +91,7 @@ def main():
     ap.add_argument("--out", default=str(OUT / "truck_violations.mp4"))
     ap.add_argument("--png-only", nargs="*", type=int)
     a = ap.parse_args()
-    ring, slots, per_slot_cam, per_slot, geo, names = load()
+    ring, slots, per_slot_cam, per_slot, geo, names, windows, approximate = load()
 
     fig = plt.figure(figsize=(19.2, 10.8), dpi=100, facecolor=BG)
     MAP = [0.01, 0.19, 0.60, 0.70]
@@ -114,7 +119,8 @@ def main():
     ax.set_axis_off()
     ax.add_patch(MplPolygon(np.c_[zx, zy], closed=True, fc=RED, alpha=0.07, lw=0, zorder=1))
     ax.add_patch(MplPolygon(np.c_[zx, zy], closed=True, fill=False, ec=RED, lw=2, ls="--", alpha=0.8, zorder=2))
-    ax.text(0.01, 0.985, "เส้นประ = เขตห้ามรถบรรทุก (ประมาณ)", transform=ax.transAxes, color=RED, fontsize=13, va="top")
+    zone_label = "ขอบเขตพื้นที่วิเคราะห์ (ประมาณการ)" if approximate else "ขอบเขตพื้นที่วิเคราะห์"
+    ax.text(0.01, 0.985, zone_label, transform=ax.transAxes, color=RED, fontsize=13, va="top")
     ax.text(0.99, 0.008, TILE_CREDIT, transform=ax.transAxes, ha="right", va="bottom", color=MUTED, fontsize=8)
     zc = geo[geo.in_zone.astype(bool)]
     ax.scatter(zc.x, zc.y, s=10, c="#5a6270", edgecolors="none", zorder=3)           # cameras (context only)
@@ -122,20 +128,21 @@ def main():
     now = ax.scatter([], [], zorder=5, edgecolors="white", linewidths=1.5)
 
     # ---- header
-    fig.text(0.03, 0.955, "รถบรรทุกวิ่งในเขตห้าม ระหว่างเวลาห้าม", color=FG, fontsize=30, weight="bold", va="center")
-    fig.text(0.03, 0.912, "เฉพาะวันธรรมดา ช่วงห้าม 6 ล้อขึ้นไป (06:00–09:00 และ 16:00–20:00) · 1 เฟรม = 10 นาที",
+    fig.text(0.03, 0.955, "การพบรถบรรทุกหนักในพื้นที่ศึกษา", color=FG, fontsize=30, weight="bold", va="center")
+    window_text = " และ ".join(f"{start}–{end}" for start, end in windows)
+    fig.text(0.03, 0.912, f"เกณฑ์เวลา 6 ล้อ {window_text} น. ในวันทำงาน · 1 เฟรม = 10 นาที",
              color=MUTED, fontsize=15, va="center")
 
     # ---- right panel
     t_time = fig.text(0.64, 0.85, "", color=FG, fontsize=28, weight="bold", va="center")
     t_win = fig.text(0.64, 0.80, "", color=RED, fontsize=18, va="center")
     t_big = fig.text(0.64, 0.70, "", color=RED, fontsize=64, weight="bold", va="center")
-    fig.text(0.64, 0.63, "คันที่เห็นในเขตห้าม ในช่วงห้ามนี้", color=FG, fontsize=16, va="center")
+    fig.text(0.64, 0.63, "ครั้งที่พบในช่วงนี้", color=FG, fontsize=16, va="center")
     fig.text(0.64, 0.56, "กล้องที่เจอมากสุดในช่วงนี้", color=MUTED, fontsize=15, va="center")
     t_top = [fig.text(0.64, 0.515 - k * 0.045, "", color=FG, fontsize=15, va="center") for k in range(5)]
-    fig.text(0.64, 0.225, "● ขนาดจุด = จำนวนคันสะสมในช่วงห้ามนี้ · จุดสว่าง = เพิ่งเห็นในรอบ 10 นาทีนี้", color=MUTED,
+    fig.text(0.64, 0.225, "ขนาดจุดแสดงยอดสะสม · จุดสว่างแสดงการพบในรอบ 10 นาทีล่าสุด", color=MUTED,
              fontsize=12)
-    fig.text(0.64, 0.195, "ตัวแยกรถบรรทุก precision ≈ 0.65 — เป็นค่าประมาณ ใช้ดูจุดและเวลาที่เกิดบ่อย ไม่ใช่หลักฐานรายคัน",
+    fig.text(0.64, 0.195, "ข้อมูลจากโมเดล · แสดงรอบที่มีกล้องรายงานอย่างน้อย 50 กล้อง",
              color=MUTED, fontsize=11)
 
     # ---- timeline: only ban windows, concatenated
@@ -154,7 +161,7 @@ def main():
     tl.tick_params(colors=MUTED, labelsize=9, length=0)
     for sp in tl.spines.values():
         sp.set_visible(False)
-    tl.set_ylabel("คัน/10 นาที", color=MUTED, fontsize=10)
+    tl.set_ylabel("ครั้ง/10 นาที", color=MUTED, fontsize=10)
     cursor = tl.axvline(0, color="white", lw=2.5)
 
     def draw(i):
@@ -172,13 +179,13 @@ def main():
         now.set_facecolors([RED] * len(cur))
 
         t_time.set_text(f"{THAI_DAYS[ts.dayofweek]} {ts.day} ส.ค.   {ts:%H:%M} น.")
-        t_win.set_text(f"ช่วงห้าม{'เช้า' if ts.hour < 12 else 'เย็น'} {win[0]}–{win[1]}")
+        t_win.set_text(f"ช่วง{'เช้า' if ts.hour < 12 else 'เย็น'} {win[0]}–{win[1]} น.")
         t_big.set_text(f"{int(c.sum())}")
         top = c.sort_values(ascending=False).head(5)
         for k, t in enumerate(t_top):
             if k < len(top):
                 cid = top.index[k]
-                t.set_text(f"{int(top.iloc[k]):>3} คัน   กล้อง {cid} · {names.get(cid, '')[:30]}")
+                t.set_text(f"{int(top.iloc[k]):>3} ครั้ง   กล้อง {cid} · {names.get(cid, '')[:30]}")
             else:
                 t.set_text("")
         cursor.set_xdata([i, i])

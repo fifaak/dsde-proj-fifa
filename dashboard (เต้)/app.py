@@ -91,6 +91,9 @@ def metrics(hourly):
 def map_figure(ranking, geo, zone, color_by):
     fig = go.Figure()
     points = ranking.merge(geo, on="camera_id")
+    if "road_name" in points:
+        road_labels = points.road_name.fillna("").map(lambda name: f"<br>ถนนใกล้กล้อง: {name}" if name else "")
+        points["label"] += road_labels
     without = points.loc[points.sightings.eq(0)]
     if not without.empty:
         fig.add_trace(go.Scattermap(
@@ -198,8 +201,11 @@ def map_view(frames, sightings, cameras, geo, zone):
                 "เส้นประแสดงขอบเขตประมาณการที่ใช้คำนวณ · ขนาดจุดแสดงจำนวนครั้งที่พบ"
                 if approximate else "เส้นประแสดงขอบเขตห้าม · ขนาดจุดแสดงจำนวนครั้งที่พบ"
             )
-        if "osm_name" in geo:
-            st.caption("พิกัดกล้องชุดนี้อ้างอิงจุดสังเกตจาก OpenStreetMap")
+        methods = set(geo.method.dropna()) if "method" in geo else set()
+        if methods & {"cctv_info", "course_metadata"}:
+            st.caption("พิกัดจากชุดกล้องของวิชา · ชื่อถนนใกล้กล้องจาก OpenStreetMap")
+        elif "osm_name" in geo:
+            st.caption("พิกัดกล้องอ้างอิงจุดสังเกตจาก OpenStreetMap")
     if not timeline.empty:
         st.subheader("ไทม์ไลน์ทุก 10 นาที")
         show_chart(timeline_figure(timeline, selected), "timeline", "จำนวนครั้งที่พบรถหนักในแต่ละ 10 นาที")
@@ -224,12 +230,12 @@ def analysis_view(hourly, cameras, weather, windows):
         for start, end in windows:
             fig.add_vrect(x0=minute_of_day(start) / 60 - 0.5, x1=minute_of_day(end) / 60 - 0.5,
                           fillcolor=ACCENT, opacity=0.12, line_width=0, layer="below")
-        st.caption("แถบส้มคือช่วงเวลาห้ามสำหรับกล้องในเขตในวันทำงาน")
+        st.caption("แถบส้มคือช่วงเวลา 6 ล้อที่ใช้วิเคราะห์กล้องในเขตในวันทำงาน")
     fig.update_xaxes(title="ชั่วโมง (เวลาไทย)", dtick=1)
     fig.update_yaxes(title_text="ครั้งที่พบต่อภาพ", secondary_y=False, rangemode="tozero")
     show_chart(chart(fig, 325, legend=dict(orientation="h", y=1.1)), "hourly-chart", "อัตราการพบรถหนักรายชั่วโมง")
     if not rain.empty:
-        st.caption("ฝนเฉลี่ยคำนวณจากวันที่เลือกที่มีข้อมูลของชั่วโมงนั้น")
+        st.caption("ฝนเฉลี่ยจาก Open-Meteo คำนวณตามกล้องและวันที่เลือกในแต่ละชั่วโมง")
     else:
         st.caption("ยังไม่มีข้อมูลฝนสำหรับช่วงที่เลือก")
 
@@ -349,10 +355,8 @@ def main():
     st.title("รถบรรทุกหนักในกรุงเทพฯ")
     st.caption("กล้องจราจร กทม. · 25–31 ส.ค. 2026 · หนึ่งภาพต่อกล้องประมาณทุก 10 นาที")
     if RESULTS != DATA:
-        st.info(
-            "พรีวิวข้อมูลเพา · ฝนจาก Open-Meteo และพิกัดจากชุดกล้องของวิชา "
-            "· ยอดช่วงห้ามยังคำนวณจากขอบเขตและเกณฑ์ประมาณการเดิม"
-        )
+        st.info("กำลังใช้ไฟล์ผลจากโฟลเดอร์พรีวิวในเครื่อง")
+    st.caption("ยอดช่วงห้ามนับตามเกณฑ์เวลา 6 ล้อที่โครงการใช้วิเคราะห์")
     metrics(hourly)
     if hourly.empty:
         st.info("ไม่มีภาพตามตัวกรองที่เลือก ลองเลือกวันที่ กล้อง หรือพื้นที่อื่น")
@@ -368,11 +372,20 @@ def main():
     with st.expander("วิธีนับและข้อจำกัด"):
         window_text = ", ".join(f"{start}–{end}" for start, end in windows)
         st.markdown(f"""
-- ช่วงเวลาห้ามที่ใช้วิเคราะห์รถหนักคือ {window_text} น. ในวันทำงาน สำหรับกล้องในเขตห้าม
+- ช่วงเวลา 6 ล้อที่ใช้เทียบรถหนักคือ {window_text} น. ในวันทำงาน สำหรับกล้องที่อยู่ในขอบเขตที่ใช้วิเคราะห์
 - ตัวเลขนับครั้งที่พบในภาพจาก YOLO และ CLIP ViT-B/16 รถคันเดิมอาจปรากฏหลายภาพ
 - โมเดลมี precision ประมาณ 0.65 และ recall 0.69 จากชุดทดสอบ 90 ตัวอย่าง ภาพมีความละเอียดต่ำจึงแยก 6 ล้อกับ 10 ล้อได้จำกัด
 - เช้าวันที่ 27 ส.ค. ข้อมูลขาดช่วง และหลังประมาณ 18:30 น. ตรวจจับยากขึ้นเพราะแสงน้อย
 """)
+        sources = rules.get("sources", {})
+        if sources.get("truck6", "").startswith("no area rule"):
+            st.markdown("ชุดแหล่งอ้างอิงยังขาดกฎ 6 ล้อสำหรับทั้งเขต ทีมจึงใช้ช่วงเวลาเดิมเป็นเกณฑ์วิเคราะห์")
+        if sources.get("truck10"):
+            truck10 = ", ".join(f"{start}–{end}" for start, end in rules["rules"]["truck10"])
+            exemptions = ", ".join(f"{start}–{end}" for start, end in rules.get("truck10_ring_exempt", []))
+            st.markdown(f"กฎ 10 ล้อที่ pipeline ดึงจาก สนข. ใช้ช่วง {truck10} น.")
+            if exemptions:
+                st.caption(f"Pipeline ใช้ข้อผ่อนผันช่วง {exemptions} น. กับถนนในรายการวงรอบที่กำหนด")
 
 
 main()

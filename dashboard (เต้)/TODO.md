@@ -22,11 +22,21 @@ python -m streamlit run app.py
 - [x] Demo script for the video (`demo.md`)
 - [x] Time-lapse clip (`make_timelapse.py` → `data_out/truck_violations.mp4`)
 
+## Integrated data
+
+- [x] Verified the pipeline outputs for all 100 course camera locations and 10,655 camera-hours with rainfall.
+- [x] Updated the dashboard, demo and slide screenshots to use the integrated data.
+- [x] Re-rendered the time-lapse from the integrated sightings and camera coordinates.
+      It shows the windows and 10-minute slots with sufficient camera coverage.
+- Local screenshots are in `data_out/dashboard_map.png`, `data_out/dashboard_rain.png` and
+  `data_out/dashboard_gallery.png`.
+
+The map uses the approximate study boundary. Its 3,028 sightings are counted using the project's weekday
+6-wheel reference windows. The rules file also records the sourced 10-wheel area rule and the exemption
+applied by the pipeline.
+
 ## Remaining
 
-- [ ] Validate rainfall, the official zone and real camera positions after scraping and pipeline integration.
-      Check that the map, ranking, and clip use the same integrated data.
-- [ ] Re-render the clip once the official zone and camera coordinates arrive.
-- [ ] Refresh screenshots for the final slides after the data update.
-- [ ] Deploy the dashboard and verify the link from a viewer session. The entry point is `dashboard (เต้)/app.py`;
-      its dependencies are in `dashboard (เต้)/requirements.txt`.
+- [x] Publish the tested updates to GitHub for deployment.
+- [ ] Deploy from `fifaak/dsde-proj-fifa`, branch `main`, entry point `dashboard (เต้)/app.py`, then verify the
+      public URL in a viewer session. Streamlit Community Cloud requires a repository admin to deploy the app.
