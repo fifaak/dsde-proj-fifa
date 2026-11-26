@@ -82,7 +82,7 @@ def load_thai(root=Path(sys.argv[0]).parent):
 
 
 def load_ours():
-    lab = pd.read_csv("modeling/labels/labels.csv")
+    lab = pd.read_csv(Path(__file__).resolve().parent / "labels" / "labels.csv")
     crops = [crop_box(Image.open(r.path).convert("RGB"), r.x1, r.y1, r.x2, r.y2) for r in lab.itertuples()]
     return crops, np.array([CLASSES.index(v) for v in lab.y4])
 

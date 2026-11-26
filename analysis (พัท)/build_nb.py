@@ -27,13 +27,13 @@ import numpy as np, pandas as pd
 import matplotlib.pyplot as plt, seaborn as sns
 from PIL import Image
 
-ROOT = Path.cwd().parent if Path.cwd().name.startswith("analysis") else Path.cwd()   # repo root
+ROOT = Path.cwd().parent if Path.cwd().name == "analysis (พัท)" else Path.cwd()   # repo root
 DATA_DIR = ROOT / "data/cctv_images"      # <-- set to the extracted zip folder
 FEAT_CSV = ROOT / "data_out/features.csv"
 OUT_DIR  = ROOT / "data_out"; OUT_DIR.mkdir(exist_ok=True)
 
 if not FEAT_CSV.exists():
-    subprocess.run([sys.executable, str(ROOT / "pipeline/extract_features.py"), str(DATA_DIR), str(FEAT_CSV)], check=True)
+    subprocess.run([sys.executable, str(ROOT / "pipeline (เก้อ)/extract_features.py"), str(DATA_DIR), str(FEAT_CSV)], check=True)
 
 sns.set_theme(style="whitegrid", context="notebook")
 plt.rcParams["figure.dpi"] = 110

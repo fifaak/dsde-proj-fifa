@@ -8,6 +8,7 @@ Usage: python "modeling (พัท)/eval_yoloe.py" [--model models/yoloe-11l-seg
 """
 import argparse
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,7 @@ def main():
     ap.add_argument("--model", default="models/yoloe-11l-seg.pt")
     ap.add_argument("--conf", type=float, default=0.05)
     a = ap.parse_args()
-    lab = pd.read_csv("modeling/labels/labels.csv")
+    lab = pd.read_csv(Path(__file__).resolve().parent / "labels" / "labels.csv")
     names = [p for g in PROMPTS.values() for p in g]
     group = {p: g for g, ps in PROMPTS.items() for p in ps}
     dev = "mps" if torch.backends.mps.is_available() else "cpu"
