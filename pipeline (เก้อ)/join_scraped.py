@@ -11,17 +11,22 @@ from shapely.geometry import Point, shape
 from shapely.ops import unary_union
 
 OUT = Path("data_out")
+EXTERNAL = Path("scraping (เพา)/external_data/data")
 TZ = "Asia/Bangkok"
 KEY = ["camera_id", "date", "hour"]
 WX = ["rain_mm", "temp_c", "cloud_cover"]
-COLS = KEY + ["lat", "lon", "geo_method", "in_zone", "zone_edge_m", "weather_km"] + WX + ["rain_class"]
+COLS = KEY + ["lat", "lon", "geo_method", "road_name", "road_class", "in_zone", "zone_edge_m", "weather_km",
+              "rain_source"] + WX + ["rain_class"]
+GEO_COLS = ["camera_id", "lat", "lon", "method", "in_zone", "road_name", "road_class", "road_distance_m",
+            "geo_offset_m", "osm_lat", "osm_lon", "query", "osm_name"]
+ROAD_COLS = ["road_name", "road_class", "road_distance_m"]
 ALIASES = {
-    "timestamp": ["timestamp", "time", "datetime", "date_time", "valid_time", "time_local"],
+    "timestamp": ["timestamp", "time", "datetime", "date_time", "valid_time", "time_local", "hour_start"],
     "rain_mm": ["rain_mm", "precipitation_mm", "precipitation", "rain", "prcp", "rainfall"],
     "temp_c": ["temp_c", "temperature_2m", "temperature", "temp", "air_temperature"],
     "cloud_cover": ["cloud_cover", "cloudcover", "cloud_cover_pct", "clouds"],
-    "lat": ["lat", "latitude"],
-    "lon": ["lon", "lng", "longitude"],
+    "lat": ["lat", "latitude", "grid_latitude"],
+    "lon": ["lon", "lng", "longitude", "grid_longitude"],
     "camera_id": ["camera_id"],
 }
 RAIN_BINS = [-np.inf, 0.1, 2.5, 7.6, np.inf]
@@ -38,6 +43,17 @@ def km(lat1, lon1, lat2, lon2):
     p1, p2 = np.radians(lat1), np.radians(lat2)
     a = np.sin((p2 - p1) / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(np.radians(lon2 - lon1) / 2) ** 2
     return 2 * 6371.0 * np.arcsin(np.sqrt(a))
+
+
+def norm(name):
+    return re.sub(r"\s*\(.*\)\s*$", "", str(name)).strip().lower().replace(" ", "_")
+
+
+def canonical(df, names=None):
+    df.columns = [norm(c) for c in df.columns]
+    items = [(k, v) for k, v in ALIASES.items() if names is None or k in names]
+    return df.rename(columns={next(a for a in alts if a in df.columns): canon
+                              for canon, alts in items if any(a in df.columns for a in alts)})
 
 
 def load_zone(path):
@@ -71,8 +87,10 @@ def tag_cameras(geo, zone_path):
     return np.array(inside, dtype=bool), np.array(edge, dtype=float)
 
 
-def norm(name):
-    return re.sub(r"\s*\(.*\)\s*$", "", str(name)).strip().lower().replace(" ", "_")
+def read_cameras(path):
+    c = canonical(pd.read_csv(path, encoding="utf-8-sig"), ["camera_id", "lat", "lon"])
+    keep = ["camera_id", "lat", "lon"] + [x for x in ROAD_COLS if x in c.columns]
+    return c[keep].dropna(subset=["lat", "lon"]).drop_duplicates("camera_id")
 
 
 def read_weather(path, naive_tz=TZ, label="end"):
@@ -82,10 +100,7 @@ def read_weather(path, naive_tz=TZ, label="end"):
     if head is None:
         raise SystemExit(f"{path}: no time column, expected one of {ALIASES['timestamp']}")
     meta = dict(zip(map(norm, lines[0].split(",")), lines[1].split(","))) if head >= 2 else {}
-    w = pd.read_csv(path, skiprows=head, encoding="utf-8-sig")
-    w.columns = [norm(c) for c in w.columns]
-    w = w.rename(columns={next(a for a in alts if a in w.columns): canon
-                          for canon, alts in ALIASES.items() if any(a in w.columns for a in alts)})
+    w = canonical(pd.read_csv(path, skiprows=head, encoding="utf-8-sig"))
     for k in ("lat", "lon"):
         if k not in w.columns:
             v = next((meta[a] for a in ALIASES[k] if meta.get(a, "").strip()), None)
@@ -103,6 +118,8 @@ def read_weather(path, naive_tz=TZ, label="end"):
     w["ts"] = ts
     group = ["camera_id"] if "camera_id" in w.columns else (["lat", "lon"] if {"lat", "lon"} <= set(w.columns) else [])
     w = w.dropna(subset=["ts"]).drop_duplicates(group + ["ts"]).sort_values(group + ["ts"])
+    points = (w.groupby("camera_id")[["lat", "lon"]].first().reset_index()
+              if group == ["camera_id"] and {"lat", "lon"} <= set(w.columns) else None)
     step = (w.groupby(group).ts.diff() if group else w.ts.diff()).median()
     step = step if pd.notna(step) and step > pd.Timedelta(0) else pd.Timedelta(hours=1)
     start = (w.ts - step if label == "end" else w.ts).dt.floor("h")
@@ -110,12 +127,16 @@ def read_weather(path, naive_tz=TZ, label="end"):
     for c in WX:
         w[c] = pd.to_numeric(w[c], errors="coerce") if c in w.columns else np.nan
     g = w.groupby(group + ["date", "hour"])
-    return pd.concat([g.rain_mm.sum(min_count=1), g.temp_c.mean(), g.cloud_cover.mean()], axis=1).reset_index(), group
+    agg = pd.concat([g.rain_mm.sum(min_count=1), g.temp_c.mean(), g.cloud_cover.mean()], axis=1).reset_index()
+    return agg, group, points
 
 
-def attach_weather(cams, w, group):
+def attach_weather(cams, w, group, points=None):
     if group == ["camera_id"]:
-        return cams.assign(weather_km=0.0), w, group
+        if points is None:
+            return cams.assign(weather_km=np.nan), w, group
+        p = cams[["camera_id", "lat", "lon"]].merge(points, on="camera_id", how="left", suffixes=("", "_wx"))
+        return cams.assign(weather_km=km(p.lat, p.lon, p.lat_wx, p.lon_wx).round(2).to_numpy()), w, group
     if group == ["lat", "lon"]:
         pts = w[["lat", "lon"]].drop_duplicates().reset_index(drop=True)
         d = km(cams.lat.to_numpy(float)[:, None], cams.lon.to_numpy(float)[:, None],
@@ -127,14 +148,46 @@ def attach_weather(cams, w, group):
     return cams.assign(weather_km=np.nan), w, []
 
 
+def weather_frame(path, tz, label, cams, grid):
+    w, group, points = read_weather(path, tz, label)
+    n = len(points[["lat", "lon"]].drop_duplicates()) if points is not None else None
+    cams, w, keys = attach_weather(cams, w, group, points)
+    extra = [k for k in keys if k != "camera_id"]
+    f = grid.merge(cams[["camera_id", "weather_km"] + extra], on="camera_id", how="left")
+    f = f.merge(w[keys + ["date", "hour"] + WX], on=keys + ["date", "hour"], how="left")
+    return f[KEY + ["weather_km"] + WX], n or (len(w[keys].drop_duplicates()) if keys else 1)
+
+
+def update_geo(geo_raw, info, zone_path):
+    geo = geo_raw.copy()
+    if info is not None:
+        if "osm_lat" not in geo.columns:
+            geo["osm_lat"], geo["osm_lon"] = geo.lat, geo.lon
+        geo = geo.drop(columns=[c for c in ROAD_COLS if c in geo.columns])
+        geo = geo.merge(info.rename(columns={"lat": "info_lat", "lon": "info_lon"}), on="camera_id", how="left")
+        has = geo.info_lat.notna()
+        geo.loc[has, "lat"] = geo.loc[has, "info_lat"]
+        geo.loc[has, "lon"] = geo.loc[has, "info_lon"]
+        geo.loc[has, "method"] = "cctv_info"
+        geo["geo_offset_m"] = (km(geo.lat, geo.lon, geo.osm_lat, geo.osm_lon) * 1000).round()
+        geo = geo.drop(columns=["info_lat", "info_lon"])
+    in_zone, edge = tag_cameras(geo, zone_path)
+    geo["in_zone"] = in_zone
+    order = [c for c in GEO_COLS if c in geo.columns] + [c for c in geo.columns if c not in GEO_COLS]
+    return geo[order], edge
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--images", default=str(OUT / "images_clean.csv"))
     ap.add_argument("--geo", default=str(OUT / "cameras_geo.csv"))
+    ap.add_argument("--cameras", default=str(EXTERNAL / "cameras.csv"))
     ap.add_argument("--zone", default="config/ban_zone.geojson")
     ap.add_argument("--weather", default=str(OUT / "weather_hourly.csv"))
     ap.add_argument("--weather-tz", default=TZ)
     ap.add_argument("--label", choices=["end", "start"], default="end")
+    ap.add_argument("--rain", default=str(EXTERNAL / "rain_hourly.csv"))
+    ap.add_argument("--rain-label", choices=["end", "start"], default="start")
     ap.add_argument("--out", default=str(OUT / "context_camera_hour.csv"))
     a = ap.parse_args()
 
@@ -142,40 +195,50 @@ def main():
     grid = (imgs.assign(date=imgs.timestamp.dt.strftime("%Y-%m-%d"), hour=imgs.timestamp.dt.hour)[KEY]
             .drop_duplicates().sort_values(KEY).reset_index(drop=True))
 
-    geo_raw = pd.read_csv(a.geo)
+    geo_raw = pd.read_csv(a.geo).drop_duplicates("camera_id").reset_index(drop=True)
     missing = sorted(set(grid.camera_id) - set(geo_raw.camera_id))
     if missing:
         raise SystemExit(f"{a.geo}: no row for cameras {missing}")
-    geo = geo_raw.drop_duplicates("camera_id").reset_index(drop=True)
-    in_zone, edge = tag_cameras(geo, a.zone)
+    info = read_cameras(a.cameras) if Path(a.cameras).exists() else None
+    geo, edge = update_geo(geo_raw, info, a.zone)
+    if not geo.equals(geo_raw):
+        geo.to_csv(a.geo, index=False)
+        print(f"{a.geo}: updated (coordinates {'from ' + a.cameras if info is not None else 'kept'}, in_zone from {a.zone})")
+    if info is not None:
+        moved = geo.loc[geo.method.eq("cctv_info"), "geo_offset_m"]
+        print(f"cameras: {a.cameras} | {int(geo.method.eq('cctv_info').sum())} of {len(geo)} with course coordinates "
+              f"and road names | shift from geocoded point median {moved.median():.0f} m, max {moved.max():.0f} m")
+    else:
+        print(f"cameras: {a.cameras} not found, geocoded coordinates kept")
+
     cams = pd.DataFrame({"camera_id": geo.camera_id, "lat": geo.lat, "lon": geo.lon,
                          "geo_method": geo["method"] if "method" in geo.columns else "unknown",
-                         "in_zone": in_zone, "zone_edge_m": edge})
-
-    zone_map = dict(zip(cams.camera_id, cams.in_zone))
-    new_flag = geo_raw.camera_id.map(zone_map).astype(bool)
-    if "in_zone" not in geo_raw.columns or not geo_raw.in_zone.astype(bool).equals(new_flag):
-        geo_raw["in_zone"] = new_flag
-        geo_raw.to_csv(a.geo, index=False)
-        print(f"{a.geo}: in_zone updated from {a.zone}")
-
-    wpath = Path(a.weather)
-    if wpath.exists():
-        w, group = read_weather(wpath, a.weather_tz, a.label)
-        cams, w, keys = attach_weather(cams, w, group)
-        ctx = grid.merge(cams, on="camera_id", how="left").merge(w[keys + ["date", "hour"] + WX],
-                                                                  on=keys + ["date", "hour"], how="left")
-        dist = f", camera to nearest point <= {cams.weather_km.max():.1f} km" if cams.weather_km.notna().any() else ""
-        print(f"weather: {wpath} | {len(w[keys].drop_duplicates()) if keys else 1} point(s){dist} | "
-              f"camera-hours with rain_mm {ctx.rain_mm.notna().mean():.1%} | "
-              f"rainy camera-hours {int((ctx.rain_mm >= 0.1).sum()):,}")
-    else:
-        ctx = grid.merge(cams.assign(weather_km=np.nan), on="camera_id", how="left")
-        for c in WX:
-            ctx[c] = np.nan
-        print(f"weather: {wpath} not found, {', '.join(WX)} left empty")
+                         "road_name": geo["road_name"] if "road_name" in geo.columns else None,
+                         "road_class": geo["road_class"] if "road_class" in geo.columns else None,
+                         "in_zone": geo.in_zone, "zone_edge_m": edge})
+    ctx = grid.merge(cams, on="camera_id", how="left")
+    for c in WX + ["weather_km"]:
+        ctx[c] = np.nan
+    ctx["rain_source"] = pd.Series([None] * len(ctx), dtype=object)
+    for name, path, label in (("city", a.weather, a.label), ("camera", a.rain, a.rain_label)):
+        if not Path(path).exists():
+            print(f"weather ({name}): {path} not found")
+            continue
+        f, points = weather_frame(path, a.weather_tz, label, cams, grid)
+        f = ctx[KEY].merge(f, on=KEY, how="left")
+        for c in ("temp_c", "cloud_cover"):
+            ctx[c] = f[c].where(f[c].notna(), ctx[c]).to_numpy()
+        hit = f.rain_mm.notna().to_numpy()
+        ctx.loc[hit, "rain_mm"] = f.rain_mm.to_numpy()[hit]
+        ctx.loc[hit, "weather_km"] = f.weather_km.to_numpy()[hit]
+        ctx.loc[hit, "rain_source"] = name
+        dist = f", camera to point <= {f.weather_km.max():.1f} km" if f.weather_km.notna().any() else ""
+        print(f"weather ({name}): {path} | {points} point(s){dist} | label {label} | camera-hours with rain "
+              f"{hit.mean():.1%}")
     ctx["rain_class"] = pd.cut(ctx.rain_mm, RAIN_BINS, right=False, labels=RAIN_LABELS)
     ctx[COLS].to_csv(a.out, index=False)
+    print(f"rain: {int((ctx.rain_mm >= 0.1).sum()):,} rainy camera-hours, source "
+          f"{ctx.rain_source.value_counts().to_dict()}")
     print(f"zone: {a.zone} | {int(cams.in_zone.sum())} of {len(cams)} cameras inside, outside "
           f"{cams.loc[~cams.in_zone, 'camera_id'].tolist()}, no coordinates "
           f"{cams.loc[cams.lat.isna() | cams.lon.isna(), 'camera_id'].tolist()}")

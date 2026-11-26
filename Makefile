@@ -7,11 +7,17 @@ DATA          ?= data/cctv_images
 SCRAPERS      ?= geocode_cameras.py build_ban_zone.py
 WEATHER_TZ    ?= Asia/Bangkok
 WEATHER_LABEL ?= end
+RAIN_LABEL    ?= start
 FORCE         ?=
 
 OUT := data_out
 P   := pipeline (เก้อ)
 S   := scraping (เพา)
+EXT := $(S)/external_data/data
+CCTV_INFO   ?= $(EXT)/cameras.csv
+RAIN        ?= $(EXT)/rain_hourly.csv
+TRUCK_RULES ?= $(EXT)/truck_rules.csv
+EXT_STAMP   := $(OUT)/.external_inputs
 
 ARCH := $(shell uname -s)-$(shell uname -m)
 ifeq ($(ARCH),Darwin-arm64)
@@ -44,6 +50,7 @@ ZONE       := config/ban_zone.geojson
 RULES      := config/ban_rules.json
 WEATHER    := $(wildcard $(OUT)/weather_hourly.csv)
 CONTEXT    := $(OUT)/context_camera_hour.csv
+EXT_FILES  := "$(CCTV_INFO)" "$(RAIN)" "$(TRUCK_RULES)"
 SIGHTINGS  := $(OUT)/heavy_sightings.parquet
 AGG        := $(OUT)/agg_camera_hour.csv
 CLIP       := $(OUT)/truck_violations.mp4
@@ -58,9 +65,11 @@ stage_rules      := $(SIGHTINGS)
 stage_clip       := $(CLIP)
 
 ORDER := $(FEATURES) $(CLEAN) $(CAMERAS) $(DETECTIONS) $(CANDIDATES) $(OUT)/candidates_emb.npy $(VEHICLES) \
-         $(GEO) $(ZONE) $(RULES) $(OUT)/weather_hourly.csv $(CONTEXT) $(SIGHTINGS) $(AGG) $(CLIP)
+         $(GEO) $(ZONE) $(RULES) $(OUT)/weather_hourly.csv $(EXT_STAMP) $(CONTEXT) $(SIGHTINGS) $(AGG) $(CLIP)
 PATH_FILES := $(FEATURES) $(CLEAN) $(DETECTIONS) $(CANDIDATES) $(VEHICLES) $(SIGHTINGS) $(OUT)/yoloe_eval.csv \
               "modeling (พัท)/labels/labels.csv"
+
+$(shell for f in $(EXT_FILES); do if [ -e "$$f" ] && [ "$$f" -nt $(EXT_STAMP) ]; then touch $(EXT_STAMP); fi; done)
 
 ifneq ($(shell command -v uv 2>/dev/null),)
 VENV = uv venv --allow-existing --python $(1) $(2)
@@ -103,11 +112,11 @@ rules: $(SIGHTINGS) $(AGG)
 clip: $(CLIP)
 
 scraped: $(GEO) $(ZONE) $(RULES)
-	@$(CHECK) $^ $(WEATHER)
+	@$(CHECK) $^ $(WEATHER) $(EXT_FILES)
 
 scrape: | $(CAMERAS)
 	@set -e; for s in $(SCRAPERS); do echo "$(PY) \"$(S)/$$s\""; $(PY) "$(S)/$$s"; done
-	@$(CHECK) $(GEO) $(ZONE) $(RULES) $(WEATHER)
+	@$(CHECK) $(GEO) $(ZONE) $(RULES) $(WEATHER) $(EXT_FILES)
 
 validate:
 	@$(CHECK) --all
@@ -152,10 +161,15 @@ $(GEO): | $(CAMERAS)
 $(ZONE): | $(GEO)
 	$(PY) "$(S)/build_ban_zone.py"
 
-$(CONTEXT): $(CLEAN) $(GEO) $(ZONE) $(WEATHER)
-	@$(CHECK) $^
-	$(PY) "$(P)/join_scraped.py" --weather-tz $(WEATHER_TZ) --label $(WEATHER_LABEL)
-	@$(CHECK) $@ $(GEO)
+$(EXT_STAMP):
+	@touch $@
+
+$(CONTEXT): $(CLEAN) $(GEO) $(ZONE) $(WEATHER) $(EXT_STAMP)
+	@$(CHECK) $^ $(EXT_FILES)
+	$(PY) "$(P)/official_rules.py" --rules "$(TRUCK_RULES)"
+	$(PY) "$(P)/join_scraped.py" --cameras "$(CCTV_INFO)" --rain "$(RAIN)" --rain-label $(RAIN_LABEL) \
+		--weather-tz $(WEATHER_TZ) --label $(WEATHER_LABEL)
+	@$(CHECK) $@ $(GEO) $(RULES)
 
 $(SIGHTINGS): $(VEHICLES) $(CLEAN) $(CONTEXT) $(RULES)
 	@$(CHECK) $^
@@ -213,5 +227,6 @@ portable:
 	$(PY) "$(P)/portable_paths.py" $(PATH_FILES) --root $(DATA)
 
 touch:
+	@for f in $(EXT_FILES); do if [ -e "$$f" ]; then touch -t 202601010000.00 "$$f"; fi; done
 	@i=10; for f in $(ORDER); do if [ -e "$$f" ]; then touch -t 202601010000.$$i "$$f"; echo "touch $$f"; fi; \
 		i=$$((i+1)); done

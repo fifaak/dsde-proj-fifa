@@ -4,8 +4,16 @@
   "public_holidays": [],
   "rules": {
     "truck6": [["06:00", "09:00"], ["16:00", "20:00"]],
-    "truck10": [["06:00", "10:00"], ["15:00", "21:00"]]
+    "truck10": [["06:00", "21:00"]]
   },
   "heavy_rule_for_analysis": "truck6",
-  "_note": "Classifier cannot reliably separate 6 vs 10 wheels at 352x288, so the main analysis treats every heavy truck with the 6-wheel windows (which every 10-wheel truck must also obey). truck10 windows are reported separately using the unvalidated zero-shot sub-type."
+  "_note": "Classifier cannot reliably separate 6 vs 10 wheels at 352x288, so the main analysis treats every heavy truck with the 6-wheel windows (which every 10-wheel truck must also obey). truck10 windows are reported separately using the unvalidated zero-shot sub-type.",
+  "truck10_ring_exempt": [["10:00", "15:00"]],
+  "ring_roads": ["ถนนรัชดาภิเษก", "ถนนจรัญสนิทวงศ์"],
+  "sources": {
+    "truck10": "bkk-inner-ring-phase-3: สนข. แผนปี 2569–2580 หัวข้อ 4.1.2 ระยะที่ 3 และรูป 4-3",
+    "truck10_ring_exempt": "bkk-inner-ring-phase-3: exceptions",
+    "truck6": "no area rule for 6-wheel trucks in scraping (เพา)/external_data/data/truck_rules.csv; windows kept",
+    "expressway_rules": 24
+  }
 }

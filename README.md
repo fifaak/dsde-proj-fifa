@@ -31,7 +31,7 @@ submission checklist are in `docs (ฟีฟ่า)/TODO.md` (deadline Sun 6 Dec
 | 3a. Candidates | `pipeline (เก้อ)/classify_trucks.py embed` | truck/bus/large-car boxes + CLIP zero-shot scores | `data_out/candidates.parquet` | 8.5 min |
 | 3b. Classify size | `pipeline (เก้อ)/classify_vit.py` | CLIP ViT-B/16 (DataComp-XL) fine-tuned end-to-end on RTX 3090 (`modeling (พัท)/train_gpu.py`) with Thai-vehicles crops degraded to CCTV quality + 450 hand labels | `data_out/vehicles.parquet` | 12 min |
 | 4. Camera map + ban zone | `scraping (เพา)/geocode_cameras.py`, `scraping (เพา)/build_ban_zone.py` | Nominatim geocoding of camera landmarks; zone ≈ inside Ratchadaphisek ring road (+400 m) — **approximate, not the official map** | `data_out/cameras_geo.csv`, `config/ban_zone.geojson` | ~3 min |
-| 4b. Join scraped data | `pipeline (เก้อ)/join_scraped.py` | camera ↔ ban zone (point in polygon / near road), weather by hour and nearest weather point | `data_out/context_camera_hour.csv`, `in_zone` in `data_out/cameras_geo.csv` | 1 s |
+| 4b. Join scraped data | `pipeline (เก้อ)/official_rules.py`, `pipeline (เก้อ)/join_scraped.py` | course camera coordinates + nearest road, camera ↔ ban zone (point in polygon), rain per camera-hour (ECMWF grid), temperature/cloud by hour, official 10-wheel rule + ring-road exemption | `data_out/context_camera_hour.csv`, `data_out/cameras_geo.csv`, `config/ban_rules.json` | 2 s |
 | 5. Ban rules + aggregate | `pipeline (เก้อ)/rules.py`, `config/ban_rules.json` | static-object filter, weekday/ban windows, in-zone only, + zone/weather columns | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` | 5 s |
 | Checks | `pipeline (เก้อ)/validate.py` | schema, nulls, keys, time range, row counts reconciled between stages | pass / fail per file | 3 s |
 | 6. Dashboard | `dashboard (เต้)/app.py` | Streamlit + Plotly | — | — |
@@ -82,7 +82,7 @@ dataset zip (get it from Roboflow, Thailand-vehicles-2024).
 ## First results (fine-tuned CLIP ViT-B classifier, ban zone applied)
 
 - 13,177 heavy-truck sightings after removing 503 static boxes (parked trucks, on-screen labels);
-  **3,014** fall inside the ban zone during weekday 6-wheel ban windows.
+  **3,028** fall inside the ban zone during weekday 6-wheel ban windows.
 - Weekday heavy-truck rate: 0.15–0.23 per frame at 06–08, peak ~0.37 at 11:00, 0.22–0.26 at 16–17, low after 19:00
   (partly lower night-time recall).
 - In-zone cameras, ratio of (ban hours / 10–14h) weekday vs weekend = **0.94 (95% bootstrap CI 0.82–1.08)** →

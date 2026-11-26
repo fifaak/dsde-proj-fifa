@@ -22,8 +22,11 @@ Scraping does **not** count here.
 - [x] Setup doc (`SETUP.md`), pinned environments (`requirements.lock`, `requirements-coreml.lock`), CoreML export
       (`export_coreml.py`), non-Mac fallback (`BACKEND=torch`)
 - [x] Pipeline steps for the architecture diagram (`docs (ฟีฟ่า)/architecture.md`)
+- [x] Scraped data from เพา joined: course camera coordinates + nearest road (`external_data/data/cameras.csv`),
+      rain per camera-hour (`rain_hourly.csv`), temperature/cloud (`data_out/weather_hourly.csv`), official 10-wheel
+      area rule + 10:00–15:00 ring-road exemption (`truck_rules.csv` → `official_rules.py` → `config/ban_rules.json`)
 
 ## Remaining
 
-- [ ] Re-run `make all` when scraping lands: `data_out/weather_hourly.csv`, official `config/ban_zone.geojson` /
-      `config/ban_rules.json`, BMA `data_out/cameras_geo.csv`
+- [ ] Official source for the 6-wheel area windows (not in `truck_rules.csv`; `rules.truck6` keeps 06–09, 16–20)
+- [ ] Confirm `ring_roads` in `config/ban_rules.json` with the สนข. report (section 2.3.1.13)

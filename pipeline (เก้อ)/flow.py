@@ -15,11 +15,13 @@ STAGES = [
     ("extract", ["data_out/features.csv"]),
     ("cleanse", ["data_out/images_clean.csv", "data_out/cameras.csv"]),
     ("scraped", ["data_out/cameras_geo.csv", "config/ban_zone.geojson", "config/ban_rules.json",
-                 "data_out/weather_hourly.csv"]),
+                 "data_out/weather_hourly.csv", "scraping (เพา)/external_data/data/cameras.csv",
+                 "scraping (เพา)/external_data/data/rain_hourly.csv",
+                 "scraping (เพา)/external_data/data/truck_rules.csv"]),
     ("detect", ["data_out/detections.parquet"]),
     ("candidates", ["data_out/candidates.parquet"]),
     ("classify", ["data_out/vehicles.parquet"]),
-    ("join", ["data_out/context_camera_hour.csv"]),
+    ("join", ["data_out/context_camera_hour.csv", "data_out/cameras_geo.csv", "config/ban_rules.json"]),
     ("rules", ["data_out/heavy_sightings.parquet", "data_out/agg_camera_hour.csv"]),
 ]
 
@@ -59,7 +61,7 @@ def pipeline(backend: str = "", force: list[str] | None = None, rescrape: bool =
     rows = []
     for stage, files in STAGES:
         target = "scrape" if stage == "scraped" and rescrape else stage
-        extra = {"FORCE": stage} if force and stage in force else {}
+        extra = {"FORCE": stage if force and stage in force else ""}
         runner = make.with_options(retries=2, retry_delay_seconds=30) if stage == "scraped" else make
         runner(target, variables | extra)
         rows += check(stage, files)

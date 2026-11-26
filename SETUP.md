@@ -88,6 +88,8 @@ make dashboard
 | `SCRAPERS` | `geocode_cameras.py build_ban_zone.py` |
 | `WEATHER_TZ` | `Asia/Bangkok` (zone of naive timestamps in `weather_hourly.csv`) |
 | `WEATHER_LABEL` | `end` (`rain_mm` at 07:00 = rain 06:00–07:00), or `start` |
+| `CCTV_INFO` / `RAIN` / `TRUCK_RULES` | `scraping (เพา)/external_data/data/cameras.csv` / `rain_hourly.csv` / `truck_rules.csv` |
+| `RAIN_LABEL` | `start` (`hour_start` 14:00 = rain 14:00–15:00) |
 
 Prefect UI:
 
@@ -106,7 +108,7 @@ PREFECT_API_URL=http://127.0.0.1:4200/api make flow
 | detect | `pipeline (เก้อ)/detect.py` | `.venv312` (coreml) / `.venv` (torch) | `data_out/detections.parquet` |
 | candidates | `pipeline (เก้อ)/classify_trucks.py embed` | `.venv312` (coreml) / `.venv` (torch) | `data_out/candidates.parquet`, `data_out/candidates_emb.npy` |
 | classify | `pipeline (เก้อ)/classify_vit.py` | `.venv` | `data_out/vehicles.parquet` |
-| join | `pipeline (เก้อ)/join_scraped.py` | `.venv` | `data_out/context_camera_hour.csv`, `in_zone` in `data_out/cameras_geo.csv` |
+| join | `pipeline (เก้อ)/official_rules.py`, `pipeline (เก้อ)/join_scraped.py` | `.venv` | `config/ban_rules.json` (truck10 + ring-road exemption), `data_out/context_camera_hour.csv`, coordinates, roads and `in_zone` in `data_out/cameras_geo.csv` |
 | rules | `pipeline (เก้อ)/rules.py` | `.venv` | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` |
 | validate | `pipeline (เก้อ)/validate.py` | `.venv` | pass / fail per file |
 
@@ -118,6 +120,9 @@ PREFECT_API_URL=http://127.0.0.1:4200/api make flow
 | `config/ban_zone.geojson` | FeatureCollection; Polygon / MultiPolygon zone (first feature a Polygon for the clip); LineString roads allowed, width from `properties.buffer_m` (default 60 m) |
 | `config/ban_rules.json` | `rules.truck6`, `rules.truck10`: `[["HH:MM", "HH:MM"], ...]`; `public_holidays`: `["YYYY-MM-DD", ...]` |
 | `data_out/weather_hourly.csv` | `timestamp, rain_mm, temp_c, cloud_cover`; optional `lat, lon` (several points) or `camera_id`; Open-Meteo CSV export also accepted |
+| `scraping (เพา)/external_data/data/cameras.csv` | `camera_id, latitude, longitude, road_name, road_class, road_distance_m, …`; replaces geocoded coordinates |
+| `scraping (เพา)/external_data/data/rain_hourly.csv` | `camera_id, hour_start, rain_mm, grid_latitude, grid_longitude`; rain per camera, overrides city rain |
+| `scraping (เพา)/external_data/data/truck_rules.csv` | `rule_id, scope_type, vehicle_type, days_of_week, start_time, end_time, exceptions, …`; area rule → `rules.truck10`, `truck10_ring_exempt` |
 
 ## 7. Troubleshooting
 

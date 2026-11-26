@@ -8,9 +8,9 @@ flowchart LR
     subgraph S[scraping (เพา)/ · web scraping]
         S1[geocode_cameras.py<br/>OSM Nominatim]
         S2[build_ban_zone.py<br/>ring-road zone]
-        S3[TODO: weather API]
-        S4[TODO: official ban rules]
-        S5[TODO: BMA camera list<br/>Playwright]
+        S3[weather_hourly.csv + rain_hourly.csv<br/>Open-Meteo ECMWF]
+        S4[truck_rules.csv<br/>สนข. + ราชกิจจานุเบกษา]
+        S5[external_data/cameras.csv<br/>course coordinates + OSM roads]
     end
     subgraph P[pipeline (เก้อ)/ · data engineering · make all / Prefect flow]
         P0[extract_features.py<br/>image features]
@@ -18,7 +18,8 @@ flowchart LR
         P2[detect.py<br/>YOLO11s CoreML]
         P3[classify_trucks.py<br/>candidates + CLIP]
         P4[classify_vit.py<br/>fine-tuned ViT-B]
-        P6[join_scraped.py<br/>zone + weather per camera-hour]
+        P7[official_rules.py<br/>truck_rules.csv → ban_rules.json]
+        P6[join_scraped.py<br/>coordinates, zone, roads, weather per camera-hour]
         P5[rules.py<br/>ban windows + zone]
         V[validate.py<br/>checks between stages]
     end
@@ -38,8 +39,9 @@ flowchart LR
     P1 -->|images_clean.csv| P6 -->|context_camera_hour.csv| P5
     S1 -->|cameras_geo.csv| D1
     P5 -->|heavy_sightings.parquet<br/>agg_camera_hour.csv| D1 & D2 & M2
-    S3 & S4 & S5 -.-> P6
-    S4 -.->|ban_rules.json| P5
+    S3 -->|rain, temperature, cloud| P6
+    S5 -->|lat, lon, road_name| P6
+    S4 --> P7 -->|ban_rules.json| P5
     V -.- P1 & P2 & P3 & P4 & P6 & P5
     M2 --> I
     D1 --> I
@@ -54,8 +56,12 @@ flowchart LR
 | `detections.parquet` | `pipeline (เก้อ)/detect.py` | classify | `path, camera_id, timestamp, cls, conf, x1..y2` |
 | `candidates.parquet` | `pipeline (เก้อ)/classify_trucks.py embed` | classify_vit, modeling | detection cols + `zs_*` |
 | `vehicles.parquet` | `pipeline (เก้อ)/classify_vit.py` | rules | + `p_light, p_bus, p_heavy, p_other, vclass, heavy_type` |
-| `cameras_geo.csv` | `scraping (เพา)/geocode_cameras.py` (`in_zone`: `pipeline (เก้อ)/join_scraped.py`) | join, dashboard, clip | `camera_id, lat, lon, method, in_zone` |
-| `weather_hourly.csv` | `scraping (เพา)/` (TODO) | join | `timestamp, rain_mm, temp_c, cloud_cover` (+ optional `lat, lon` or `camera_id`) |
-| `context_camera_hour.csv` | `pipeline (เก้อ)/join_scraped.py` | rules | `camera_id, date, hour, lat, lon, geo_method, in_zone, zone_edge_m, weather_km, rain_mm, temp_c, cloud_cover, rain_class` |
-| `heavy_sightings.parquet` | `pipeline (เก้อ)/rules.py` | dashboard, clip, analysis | + `in_zone, in_ban6, in_ban10, violation`, + `lat, lon, zone_edge_m, rain_mm, temp_c, cloud_cover, rain_class` |
-| `agg_camera_hour.csv` | `pipeline (เก้อ)/rules.py` | dashboard, analysis | `camera_id, date, hour, weekday, in_zone, frames, heavy, ban6`, + same context columns |
+| `cameras_geo.csv` | `scraping (เพา)/geocode_cameras.py`, coordinates/roads/`in_zone` from `pipeline (เก้อ)/join_scraped.py` | join, dashboard, clip | `camera_id, lat, lon, method, in_zone, road_name, road_class, road_distance_m, geo_offset_m, osm_lat, osm_lon` |
+| `weather_hourly.csv` | `scraping (เพา)/` | join | `timestamp, rain_mm, temp_c, cloud_cover` |
+| `external_data/data/cameras.csv` | `scraping (เพา)/external_data/collect.py` | join | `camera_id, latitude, longitude, road_name, road_class, road_distance_m` |
+| `external_data/data/rain_hourly.csv` | `scraping (เพา)/external_data/collect.py` | join | `camera_id, hour_start, rain_mm, grid_latitude, grid_longitude` |
+| `external_data/data/truck_rules.csv` | `scraping (เพา)/external_data/collect.py` | official_rules | `rule_id, scope_type, vehicle_type, days_of_week, start_time, end_time, exceptions` |
+| `config/ban_rules.json` | `pipeline (เก้อ)/official_rules.py` | rules, dashboard, clip | `rules.truck6, rules.truck10, truck10_ring_exempt, ring_roads, public_holidays` |
+| `context_camera_hour.csv` | `pipeline (เก้อ)/join_scraped.py` | rules | `camera_id, date, hour, lat, lon, geo_method, road_name, road_class, in_zone, zone_edge_m, weather_km, rain_source, rain_mm, temp_c, cloud_cover, rain_class` |
+| `heavy_sightings.parquet` | `pipeline (เก้อ)/rules.py` | dashboard, clip, analysis | + `in_zone, in_ban6, in_ban10, violation`, + `lat, lon, road_name, zone_edge_m, rain_mm, temp_c, cloud_cover, rain_class, ring_road` |
+| `agg_camera_hour.csv` | `pipeline (เก้อ)/rules.py` | dashboard, analysis | `camera_id, date, hour, weekday, in_zone, frames, heavy, ban6`, + same context columns, `ban10` |

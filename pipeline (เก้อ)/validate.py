@@ -11,7 +11,7 @@ from shapely.geometry import shape
 
 sys.path.insert(0, str(Path(__file__).parent))
 from join_scraped import COLS as CONTEXT_COLS  # noqa: E402
-from join_scraped import load_zone, read_weather  # noqa: E402
+from join_scraped import EXTERNAL, canonical, load_zone, read_weather  # noqa: E402
 
 OUT = Path("data_out")
 BKK = (13.49, 100.32, 13.96, 100.94)
@@ -35,7 +35,7 @@ SIGHTINGS = DET + PROBS + ["vclass", "heavy_type", "date", "hour", "minute_of_da
                            "in_ban10", "ban_hours6", "violation", "camera_name", "location"]
 AGG = ["camera_id", "date", "hour", "weekday", "in_zone", "frames", "night", "heavy", "heavy_frames", "heavy10", "ban6",
        "heavy_per_frame", "camera_name", "location"]
-EXTRA = ["lat", "lon", "zone_edge_m", "rain_mm", "temp_c", "cloud_cover", "rain_class"]
+EXTRA = ["lat", "lon", "road_name", "zone_edge_m", "rain_mm", "temp_c", "cloud_cover", "rain_class", "ring_road"]
 _cache = {}
 
 
@@ -256,6 +256,11 @@ def check_rules(c):
             ok = (isinstance(w, list) and len(w) == 2 and all(re.fullmatch(r"\d{2}:\d{2}", str(x)) for x in w)
                   and w[0] < w[1])
             c.need(ok, f"rules.{k}: bad window {w}")
+    for w in cfg.get("truck10_ring_exempt", []):
+        ok = isinstance(w, list) and len(w) == 2 and all(re.fullmatch(r"\d{2}:\d{2}", str(x)) for x in w) and w[0] < w[1]
+        c.need(ok, f"truck10_ring_exempt: bad window {w}")
+    ring = cfg.get("ring_roads", [])
+    c.need(isinstance(ring, list) and all(isinstance(x, str) and x for x in ring), "ring_roads must be a list of names")
     hol = cfg.get("public_holidays")
     if c.need(isinstance(hol, list), "public_holidays must be a list"):
         bad = [h for h in hol if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(h))]
@@ -280,12 +285,12 @@ def check_zone(c):
     c.warn(first == "Polygon", f"first feature is {first}, make_timelapse.py draws the first Polygon only")
 
 
-def check_weather(c):
+def check_weather(c, label="end"):
     try:
-        w, group = read_weather(c.path)
+        w, group, _ = read_weather(c.path, label=label)
     except (Exception, SystemExit) as e:
         c.need(False, f"cannot read weather: {e}")
-        return
+        return None
     c.rows = len(w)
     c.need(len(w) > 0, "no rows")
     hour_span(c, w)
@@ -297,6 +302,59 @@ def check_weather(c):
     have = set(zip(w.date, w.hour))
     miss = [(d, h) for d in days for h in CAPTURE_HOURS if (d, h) not in have]
     c.warn(not miss, f"{len(miss)} of {len(days) * len(CAPTURE_HOURS)} capture hours without weather, first {miss[:3]}")
+    return w, group
+
+
+def reference_cameras():
+    for p in (OUT / "cameras.csv", OUT / "images_clean.csv"):
+        if p.exists():
+            return set(load(p, ["camera_id"]).camera_id)
+    return set()
+
+
+def check_camera_rain(c):
+    got = check_weather(c, label="start")
+    if got is None:
+        return
+    w, group = got
+    if not c.need(group == ["camera_id"], "no camera_id column"):
+        return
+    c.cams = int(w.camera_id.nunique())
+    miss = sorted(reference_cameras() - set(w.camera_id))
+    c.need(not miss, f"no rain rows for cameras {miss[:10]}")
+    days = pd.date_range(T0, T1, inclusive="left").strftime("%Y-%m-%d")
+    have = w[w.rain_mm.notna()].groupby("camera_id").apply(lambda d: len(set(zip(d.date, d.hour))), include_groups=False)
+    short = have[have < len(days) * len(CAPTURE_HOURS)]
+    c.warn(short.empty, f"{len(short)} cameras missing some capture hours")
+
+
+def read_external(c, names, **kw):
+    df = canonical(pd.read_csv(c.path, encoding="utf-8-sig", **kw), names)
+    c.rows = len(df)
+    return df
+
+
+def check_cctv_info(c):
+    df = read_external(c, ["camera_id", "lat", "lon"])
+    df["camera_id"] = pd.to_numeric(df.camera_id, errors="coerce")
+    table(c, df, ["camera_id", "lat", "lon", "road_name"], notnull=["camera_id", "lat", "lon"], unique=[("camera_id",)],
+          ranges={"lat": (BKK[0], BKK[2]), "lon": (BKK[1], BKK[3])})
+    miss = sorted(reference_cameras() - set(df.camera_id)) if "camera_id" in df.columns else []
+    c.need(not miss, f"no coordinates for cameras {miss[:10]}")
+
+
+def check_truck_rules(c):
+    df = read_external(c, [], dtype=str).fillna("")
+    need = ["rule_id", "scope_type", "vehicle_type", "days_of_week", "start_time", "end_time"]
+    missing = [x for x in need if x not in df.columns]
+    if not c.need(not missing, f"missing columns {missing}"):
+        return
+    c.need(df.rule_id.is_unique, "duplicate rule_id")
+    hm = r"\d{1,2}[:.]\d{2}"
+    bad = df[~(df.start_time.str.fullmatch(hm) & df.end_time.str.fullmatch(hm))]
+    c.need(bad.empty, f"bad times in {bad.rule_id.tolist()[:5]}")
+    area10 = df[df.scope_type.eq("area") & df.vehicle_type.str.contains("10 ล้อ")]
+    c.warn(not area10.empty, "no area rule for 10-wheel trucks, config/ban_rules.json keeps its windows")
 
 
 def check_context(c):
@@ -324,6 +382,7 @@ def check_sightings(c):
     if {"in_ban6", "weekday", "in_zone", "violation", "in_ban10"} <= set(df.columns):
         c.need(not (df.in_ban6 & ~(df.weekday & df.in_zone)).any(), "in_ban6 set outside weekday in-zone frames")
         c.need(not (df.violation & ~(df.in_ban6 | df.in_ban10)).any(), "violation outside ban windows")
+        c.need(not (df.in_ban10 & ~(df.weekday & df.in_zone)).any(), "in_ban10 set outside weekday in-zone frames")
     c.warn(set(EXTRA) <= set(df.columns), "no scraped context columns (run make join rules)")
     if f := sibling(c, "vehicles.parquet"):
         n = int((load(f, ["vclass"]).vclass == "heavy").sum())
@@ -331,14 +390,16 @@ def check_sightings(c):
 
 
 def check_agg(c):
-    df = load(c.path, AGG + EXTRA)
+    df = load(c.path, AGG + EXTRA + ["ban10"])
     table(c, df, AGG, notnull=["camera_id", "date", "hour", "frames", "heavy"], unique=[("camera_id", "date", "hour")],
           ranges={"frames": (1, 60), "night": (0, 1), "heavy": (0, 10000)})
     if len(df) and {"date", "hour"} <= set(df.columns):
         hour_span(c, df)
     if {"heavy", "frames", "heavy_per_frame"} <= set(df.columns):
         c.need(np.allclose(df.heavy_per_frame, df.heavy / df.frames), "heavy_per_frame != heavy / frames")
-    c.warn(set(EXTRA) <= set(df.columns), "no scraped context columns (run make join rules)")
+    c.warn(set(EXTRA + ["ban10"]) <= set(df.columns), "no scraped context columns (run make join rules)")
+    if {"ban10", "weekday", "in_zone"} <= set(df.columns):
+        c.need(not (df.ban10 & ~(df.weekday & df.in_zone)).any(), "ban10 set outside weekday in-zone hours")
     if (f := sibling(c, "images_clean.csv")) and "frames" in df.columns:
         n = len(load(f, ["path"]))
         c.need(int(df.frames.sum()) == n, f"frames sum {int(df.frames.sum()):,} != images_clean rows {n:,}")
@@ -362,17 +423,23 @@ CHECKS = {
     "heavy_sightings.parquet": check_sightings,
     "agg_camera_hour.csv": check_agg,
 }
+EXTERNAL_CHECKS = {
+    "external_data/data/cameras.csv": check_cctv_info,
+    "external_data/data/rain_hourly.csv": check_camera_rain,
+    "external_data/data/truck_rules.csv": check_truck_rules,
+}
 ALL = [OUT / "features.csv", OUT / "images_clean.csv", OUT / "cameras.csv", OUT / "detections.parquet",
        OUT / "candidates.parquet", OUT / "vehicles.parquet", OUT / "cameras_geo.csv", OUT / "weather_hourly.csv",
+       EXTERNAL / "cameras.csv", EXTERNAL / "rain_hourly.csv", EXTERNAL / "truck_rules.csv",
        Path("config/ban_rules.json"), Path("config/ban_zone.geojson"), OUT / "context_camera_hour.csv",
        OUT / "heavy_sightings.parquet", OUT / "agg_camera_hour.csv"]
-OPTIONAL = {"features.csv", "cameras.csv", "weather_hourly.csv"}
+OPTIONAL = {"features.csv", "cameras.csv", "weather_hourly.csv", "rain_hourly.csv", "truck_rules.csv"}
 
 
 def run(paths):
     results = []
     for p in map(Path, paths):
-        fn = CHECKS.get(p.name)
+        fn = next((f for k, f in EXTERNAL_CHECKS.items() if p.as_posix().endswith(k)), None) or CHECKS.get(p.name)
         if fn is None:
             continue
         c = Check(p)
