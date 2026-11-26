@@ -1,9 +1,10 @@
 """Stage 4: truck-ban rule engine + aggregation.
 
 Inputs
-  data_out/images_clean.csv   one row per valid image (denominator: frames observed)
-  data_out/vehicles.parquet   classified candidate boxes (vclass, heavy_type)
-  config/ban_rules.json       ban windows
+  data_out/images_clean.csv          one row per valid image (denominator: frames observed)
+  data_out/vehicles.parquet          classified candidate boxes (vclass, heavy_type)
+  data_out/context_camera_hour.csv   scraped data per camera x date x hour (join_scraped.py): in_zone, weather
+  config/ban_rules.json              ban windows
 
 Steps
   1. Static-object filter: a "heavy" box that sits in the same place (16 px grid) in >= 3% of a camera's frames is a
@@ -25,6 +26,8 @@ import pandas as pd
 
 OUT = Path("data_out")
 GRID, STATIC_SHARE = 16, 0.03
+KEY = ["camera_id", "date", "hour"]
+CONTEXT = ["lat", "lon", "zone_edge_m", "rain_mm", "temp_c", "cloud_cover", "rain_class"]
 
 
 def to_min(hhmm: str) -> int:
@@ -54,24 +57,24 @@ def main():
           f"({heavy[heavy.static].camera_id.nunique()} cameras)")
     heavy = heavy[~heavy.static].drop(columns=["static", "loc_frames"])
 
-    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see scraping (เพา)/build_ban_zone.py)
+    # 2. day type + ban flags (ban applies only to cameras inside the ban zone, see pipeline (เก้อ)/join_scraped.py)
     holidays = set(cfg["public_holidays"])
-    geo_path = OUT / "cameras_geo.csv"
-    zone = (pd.read_csv(geo_path).set_index("camera_id").in_zone if geo_path.exists() and
-            "in_zone" in pd.read_csv(geo_path, nrows=1).columns else None)
+    ctx = pd.read_csv(OUT / "context_camera_hour.csv")
+    zone = ctx.drop_duplicates("camera_id").set_index("camera_id").in_zone
     for df in (imgs, heavy):
         ts = pd.to_datetime(df.timestamp)
         df["date"] = ts.dt.date.astype(str)
         df["hour"] = ts.dt.hour
         df["minute_of_day"] = ts.dt.hour * 60 + ts.dt.minute
-        df["weekday"] = ((ts.dt.dayofweek < 5) & ~df.date.isin(holidays)).to_numpy()
-        df["in_zone"] = df.camera_id.map(zone).fillna(True).astype(bool) if zone is not None else True
+        df["weekday"] = ((ts.dt.day_of_week < 5) & ~df.date.isin(holidays)).to_numpy()
+        df["in_zone"] = df.camera_id.map(zone).fillna(True).astype(bool)
         df["in_ban6"] = df.weekday & df.in_zone & in_windows(df.minute_of_day, cfg["rules"]["truck6"])
         df["in_ban10"] = df.weekday & df.in_zone & in_windows(df.minute_of_day, cfg["rules"]["truck10"])
         # same clock windows regardless of weekday: used to compare weekday vs weekend at matching hours
         df["ban_hours6"] = in_windows(df.minute_of_day, cfg["rules"]["truck6"])
     heavy["violation"] = np.where(heavy.heavy_type == "truck10", heavy.in_ban10, heavy.in_ban6)
     heavy = heavy.merge(imgs[["path", "camera_name", "location"]], on="path", how="left")
+    heavy = heavy.merge(ctx[KEY + CONTEXT], on=KEY, how="left")
     heavy.to_parquet(OUT / "heavy_sightings.parquet")
 
     # 3. aggregate (frames are the denominator: one frame every ~10 min per camera)
@@ -83,6 +86,7 @@ def main():
     agg["ban6"] = agg.weekday & agg.in_zone & in_windows(agg.hour * 60, cfg["rules"]["truck6"])
     agg["heavy_per_frame"] = agg.heavy / agg.frames
     agg = agg.merge(imgs.drop_duplicates("camera_id")[["camera_id", "camera_name", "location"]], on="camera_id")
+    agg = agg.merge(ctx[KEY + CONTEXT], on=KEY, how="left")
     agg.to_csv(OUT / "agg_camera_hour.csv", index=False)
 
     wk = agg[agg.weekday]

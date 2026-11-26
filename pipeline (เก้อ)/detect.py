@@ -102,7 +102,7 @@ class TorchDetector:
 
     def run(self, paths):
         res = self.m.predict(paths, imgsz=self.imgsz, conf=self.conf, classes=list(COCO_VEHICLES), device=self.dev,
-                             half=self.dev != "cpu", verbose=False)
+                             verbose=False, **({"half": True} if self.dev != "cpu" else {}))
         out = []
         for det in res:
             h, w = det.orig_shape
@@ -161,6 +161,7 @@ def main():
 
     parts = [pd.read_parquet(f) for f in sorted(ckpt.glob("chunk_*.parquet"))]
     res = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=COLS)
+    res = res[res.path.isin(set(imgs.path))].reset_index(drop=True)
     res.to_parquet(out)
     print(f"wrote {out}: {len(res)} boxes from {res.path.nunique()} images in {(time.time() - t0) / 60:.1f} min")
 

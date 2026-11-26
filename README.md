@@ -26,28 +26,26 @@ submission checklist are in `docs (ฟีฟ่า)/TODO.md` (deadline Sun 6 Dec
 
 | Stage | Script | Model / method | Output | Time (M4 Pro) |
 |---|---|---|---|---|
-| 1. Clean + EDA | `pipeline (เก้อ)/extract_features.py`, `analysis (พัท)/eda_cctv.ipynb` | filename parsing, image stats | `data_out/images_clean.csv` (60,782 valid) | 20 s |
+| 1. Clean + EDA | `pipeline (เก้อ)/extract_features.py`, `pipeline (เก้อ)/clean.py`, `analysis (พัท)/eda_cctv.ipynb` | filename parsing, image stats, cleaning rules of the EDA notebook §8 | `data_out/features.csv`, `data_out/images_clean.csv` (60,782 valid), `data_out/cameras.csv` | 20 s |
 | 2. Detect vehicles | `pipeline (เก้อ)/detect.py` | YOLO11s → CoreML fp16 on Neural Engine | `data_out/detections.parquet` (526,748 boxes) | 3.5 min |
 | 3a. Candidates | `pipeline (เก้อ)/classify_trucks.py embed` | truck/bus/large-car boxes + CLIP zero-shot scores | `data_out/candidates.parquet` | 8.5 min |
 | 3b. Classify size | `pipeline (เก้อ)/classify_vit.py` | CLIP ViT-B/16 (DataComp-XL) fine-tuned end-to-end on RTX 3090 (`modeling (พัท)/train_gpu.py`) with Thai-vehicles crops degraded to CCTV quality + 450 hand labels | `data_out/vehicles.parquet` | 12 min |
 | 4. Camera map + ban zone | `scraping (เพา)/geocode_cameras.py`, `scraping (เพา)/build_ban_zone.py` | Nominatim geocoding of camera landmarks; zone ≈ inside Ratchadaphisek ring road (+400 m) — **approximate, not the official map** | `data_out/cameras_geo.csv`, `config/ban_zone.geojson` | ~3 min |
-| 5. Ban rules + aggregate | `pipeline (เก้อ)/rules.py`, `config/ban_rules.json` | static-object filter, weekday/ban windows, in-zone only | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` | 5 s |
+| 4b. Join scraped data | `pipeline (เก้อ)/join_scraped.py` | camera ↔ ban zone (point in polygon / near road), weather by hour and nearest weather point | `data_out/context_camera_hour.csv`, `in_zone` in `data_out/cameras_geo.csv` | 1 s |
+| 5. Ban rules + aggregate | `pipeline (เก้อ)/rules.py`, `config/ban_rules.json` | static-object filter, weekday/ban windows, in-zone only, + zone/weather columns | `data_out/heavy_sightings.parquet`, `data_out/agg_camera_hour.csv` | 5 s |
+| Checks | `pipeline (เก้อ)/validate.py` | schema, nulls, keys, time range, row counts reconciled between stages | pass / fail per file | 3 s |
 | 6. Dashboard | `dashboard (เต้)/app.py` | Streamlit + Plotly | — | — |
 | 7. Violation clip | `dashboard (เต้)/make_timelapse.py` | matplotlib + ffmpeg; only weekday 6-wheel ban windows, only trucks inside the zone | `data_out/truck_violations.mp4` (1080p, 40 s) | 1 min |
 
-Ban flags apply only to cameras inside the zone (94/100); run `scraping (เพา)/build_ban_zone.py` before `pipeline (เก้อ)/rules.py`.
-Run everything from the repo root.
+Ban flags apply only to cameras inside the zone (94/100); `in_zone` comes from `config/ban_zone.geojson` via
+`pipeline (เก้อ)/join_scraped.py`. Run everything from the repo root. Setup: [`SETUP.md`](SETUP.md).
 
 ```bash
-# envs: .venv (requirements.txt) and .venv312 (Python 3.12, CoreML: pipeline (เก้อ)/requirements-coreml.txt)
-python "pipeline (เก้อ)/extract_features.py" data/cctv_images data_out/features.csv      # then run "analysis (พัท)/eda_cctv.ipynb"
-.venv312/bin/python "pipeline (เก้อ)/detect.py" data_out/images_clean.csv data_out/detections.parquet
-.venv312/bin/python "pipeline (เก้อ)/classify_trucks.py" embed data_out/detections.parquet data_out/candidates
-python "pipeline (เก้อ)/classify_vit.py" data_out/candidates.parquet models/truck_clipvitb.pt data_out/vehicles.parquet
-python "scraping (เพา)/geocode_cameras.py" && python "scraping (เพา)/build_ban_zone.py"
-python "pipeline (เก้อ)/rules.py"
-streamlit run "dashboard (เต้)/app.py"
-python "dashboard (เต้)/make_timelapse.py" --fps 6
+make setup && make models && make data
+make all
+make flow
+make dashboard
+make clip
 ```
 
 **Model weights** are in the GitHub Release
@@ -94,5 +92,5 @@ dataset zip (get it from Roboflow, Thailand-vehicles-2024).
 ## Next
 
 - `scraping (เพา)/`: weather, official ban rules/zone, BMA camera list (required: ≥3 sources or 1 with Playwright).
-- `pipeline (เก้อ)/`: one-command end-to-end run (Makefile / Prefect) and join of scraped data.
+- `pipeline (เก้อ)/`: re-run `make all` when scraped files land (`data_out/weather_hourly.csv`, official `config/ban_zone.geojson` / `config/ban_rules.json`, BMA `data_out/cameras_geo.csv`).
 - `insights (ม่อน)/` + `docs (ฟีฟ่า)/`: findings, slides, 15-min video, submission by Sun 6 Dec 2026.

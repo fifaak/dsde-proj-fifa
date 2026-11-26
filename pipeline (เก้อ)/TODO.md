@@ -10,17 +10,20 @@ Scraping does **not** count here.
 - [x] Vehicle detection, YOLO11s CoreML (`detect.py`)
 - [x] Candidates + truck classifier (`classify_trucks.py embed`, `classify_vit.py`)
 - [x] Ban rules, static-object filter, aggregation (`rules.py`)
+- [x] One-command end-to-end run: `make all` (`Makefile`) and `make flow` (Prefect, `flow.py`); finished stages are
+      skipped, every stage logs row counts
+- [x] Cleaning as a script (`clean.py`), same output as the EDA notebook §8 (byte-identical `images_clean.csv`)
+- [x] Join scraped data (`join_scraped.py` → `context_camera_hour.csv`): ban zone per camera from
+      `config/ban_zone.geojson`, weather per camera-hour (nearest point, timezone, hour label); `rules.py` adds
+      `lat, lon, zone_edge_m, rain_mm, temp_c, cloud_cover, rain_class`
+- [x] Data-quality checks between stages (`validate.py`): schema, nulls, keys, time range, row counts; non-zero exit
+- [x] Portable paths (`portable_paths.py`, `make portable`): `data/cctv_images/<camera_id>/<file>`
+- [x] Data access: GitHub Release `models-v1` + `models/download.sh` (`make models`, `make data`)
+- [x] Setup doc (`SETUP.md`), pinned environments (`requirements.lock`, `requirements-coreml.lock`), CoreML export
+      (`export_coreml.py`), non-Mac fallback (`BACKEND=torch`)
+- [x] Pipeline steps for the architecture diagram (`docs (ฟีฟ่า)/architecture.md`)
 
 ## Remaining
 
-- [ ] **One-command end-to-end run** (`Makefile` or a Prefect/Airflow flow): scraping → clean → detect →
-      classify → rules → dashboard data. Each step skips work already done and logs row counts.
-- [ ] **Join scraped data**: weather → `agg_camera_hour.csv` (rain per camera-hour); official rules/zone →
-      `rules.py`; real camera coordinates → `cameras_geo.csv`
-- [ ] **Data-quality checks between stages**: schema, row counts, nulls, timestamp range; fail loudly
-- [ ] **Portable paths**: parquet/csv files store absolute image paths from the dev Mac. Store paths relative
-      to a configurable `DATA_DIR` so teammates (and the dashboard gallery) can find the images.
-- [ ] **Data access**: put the raw image zip, Thai dataset and model weights on Google Drive + a download script
-- [ ] **Setup doc**: the two environments (`requirements.txt`, `requirements-coreml.txt`), CoreML export steps,
-      the non-Mac fallback (`detect.py --backend torch`, `classify_trucks.py embed --backend torch`)
-- [ ] Give ฟีฟ่า the pipeline steps for the architecture diagram (`docs (ฟีฟ่า)/architecture.md`)
+- [ ] Re-run `make all` when scraping lands: `data_out/weather_hourly.csv`, official `config/ban_zone.geojson` /
+      `config/ban_rules.json`, BMA `data_out/cameras_geo.csv`

@@ -9,3 +9,4 @@ pyarrow==17.0.0
 pandas
 pillow
 ultralytics
+open_clip_torch

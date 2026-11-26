@@ -26,3 +26,5 @@ data_out/*
 !models/download.sh
 !data_out/features.csv
 !data_out/thai.parquet
+!data_out/context_camera_hour.csv
+!data_out/weather_hourly.csv
